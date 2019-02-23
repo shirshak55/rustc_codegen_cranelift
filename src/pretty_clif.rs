@@ -267,7 +267,7 @@ pub(crate) fn write_clif_file<'tcx>(
         file.write(clif.as_bytes())?;
     };
     if let Err(err) = res {
-        tcx.sess.warn(&format!("err writing clif file: {}", err));
+        //tcx.sess.warn(&format!("err writing clif file: {}", err));
     }
 }
 

@@ -11,7 +11,7 @@ popd >/dev/null
 
 # Cleanup for previous run
 #     v Clean target dir except for build scripts and incremental cache
-rm -r target/*/{debug,release}/{build,deps,examples,libsysroot*,native} 2>/dev/null || true
+#rm -r target/*/{debug,release}/{build,deps,examples,libsysroot*,native} 2>/dev/null || true
 rm -r sysroot/ 2>/dev/null || true
 
 # Use rustc with cg_clif as hotpluggable backend instead of the custom cg_clif driver so that
