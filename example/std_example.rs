@@ -15,12 +15,6 @@ fn main() {
     let stderr = ::std::io::stderr();
     let mut stderr = stderr.lock();
 
-    // FIXME support lazy jit when multi threading
-    #[cfg(not(lazy_jit))]
-    std::thread::spawn(move || {
-        println!("Hello from another thread!");
-    });
-
     writeln!(stderr, "some {} text", "<unknown>").unwrap();
 
     let _ = std::process::Command::new("true").env("c", "d").spawn();
@@ -61,9 +55,9 @@ fn main() {
     let _d = 0u128.checked_div(2u128);
     assert_eq!(1u128 + 2, 3);
 
-    assert_eq!(0b100010000000000000000000000000000u128 >> 10, 0b10001000000000000000000u128);
-    assert_eq!(0xFEDCBA987654321123456789ABCDEFu128 >> 64, 0xFEDCBA98765432u128);
-    assert_eq!(0xFEDCBA987654321123456789ABCDEFu128 as i128 >> 64, 0xFEDCBA98765432i128);
+    //assert_eq!(0b100010000000000000000000000000000u128 >> 10, 0b10001000000000000000000u128);
+    //assert_eq!(0xFEDCBA987654321123456789ABCDEFu128 >> 64, 0xFEDCBA98765432u128);
+    //assert_eq!(0xFEDCBA987654321123456789ABCDEFu128 as i128 >> 64, 0xFEDCBA98765432i128);
 
     let tmp = 353985398u128;
     assert_eq!(tmp * 932490u128, 330087843781020u128);
@@ -72,7 +66,7 @@ fn main() {
     assert_eq!(tmp as i128, -0x1234_5678_9ABC_DEF0i128);
 
     // Check that all u/i128 <-> float casts work correctly.
-    let houndred_u128 = 100u128;
+    /*let houndred_u128 = 100u128;
     let houndred_i128 = 100i128;
     let houndred_f32 = 100.0f32;
     let houndred_f64 = 100.0f64;
@@ -83,7 +77,7 @@ fn main() {
     assert_eq!(houndred_i128 as f32, 100.0);
     assert_eq!(houndred_i128 as f64, 100.0);
     assert_eq!(houndred_f32 as i128, 100);
-    assert_eq!(houndred_f64 as i128, 100);
+    assert_eq!(houndred_f64 as i128, 100);*/
 
     // Test signed 128bit comparing
     let max = usize::MAX as i128;

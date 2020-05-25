@@ -14,6 +14,7 @@ pub(crate) fn init_global_lock(
     bcx: &mut FunctionBuilder<'_>,
     use_jit: bool,
 ) {
+    return;
     if use_jit {
         // When using JIT, dylibs won't find the __cg_clif_global_atomic_mutex data object defined here,
         // so instead we define it in the cg_clif dylib.
@@ -101,6 +102,7 @@ pub(crate) fn init_global_lock_constructor(
 }
 
 pub(crate) fn lock_global_lock(fx: &mut FunctionCx<'_, '_, impl Module>) {
+    return;
     let atomic_mutex = fx
         .cx
         .module
@@ -143,6 +145,7 @@ pub(crate) fn lock_global_lock(fx: &mut FunctionCx<'_, '_, impl Module>) {
 }
 
 pub(crate) fn unlock_global_lock(fx: &mut FunctionCx<'_, '_, impl Module>) {
+    return;
     let atomic_mutex = fx
         .cx
         .module
