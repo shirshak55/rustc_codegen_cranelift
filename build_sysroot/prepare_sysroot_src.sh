@@ -21,7 +21,19 @@ echo "[GIT] add"
 git add .
 echo "[GIT] commit"
 git commit -m "Initial commit" -q
-for file in $(ls ../../patches/ | grep -v patcha); do
+for file in $(ls ../../patches/ | grep -v patcha | grep -v compiler-builtins); do
+echo "[GIT] apply" $file
+git apply ../../patches/$file
+git add -A
+git commit --no-gpg-sign -m "Patch $file"
+done
+popd
+
+git clone https://github.com/rust-lang/compiler-builtins.git || true
+pushd compiler-builtins
+git fetch
+git reset --hard 7b996ca0fa969199332d703b81fb411d85e5f7c4
+for file in $(ls ../../patches/ | grep -v patcha | grep compiler-builtins); do
 echo "[GIT] apply" $file
 git apply ../../patches/$file
 git add -A

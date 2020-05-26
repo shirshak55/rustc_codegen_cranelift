@@ -16,6 +16,7 @@ alloc_system = { path = "./alloc_system" }
 rustc-std-workspace-core = { path = "./sysroot_src/library/rustc-std-workspace-core" }
 rustc-std-workspace-alloc = { path = "./sysroot_src/library/rustc-std-workspace-alloc" }
 rustc-std-workspace-std = { path = "./sysroot_src/library/rustc-std-workspace-std" }
+compiler_builtins = { path = "./compiler-builtins" }
 
 [profile.dev]
 lto = "off"
