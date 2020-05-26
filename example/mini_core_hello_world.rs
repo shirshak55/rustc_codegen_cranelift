@@ -282,7 +282,7 @@ fn main() {
     let slice_ptr = &[] as *const [u8];
     slice_ptr as *const u8;
 
-    #[cfg(not(jit))]
+    #[cfg(not(any(jit, windows)))]
     test_tls();
 
     #[cfg(all(not(jit), target_os = "linux"))]
