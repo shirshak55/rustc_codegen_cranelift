@@ -692,6 +692,7 @@ fn trans_stmt<'tcx>(
                 "int $$0x29" => {
                     crate::trap::trap_unimplemented(fx, "Windows abort");
                 }
+                asm => crate::trap::trap_unimplemented(fx, &format!("asm \"{}\" is not supported", asm)),
                 _ => fx.tcx.sess.span_fatal(stmt.source_info.span, "Inline assembly is not supported"),
             }
         }

@@ -5,8 +5,8 @@
 
 use crate::prelude::*;
 
-#[no_mangle]
-pub static mut __cg_clif_global_atomic_mutex: libc::pthread_mutex_t = libc::PTHREAD_MUTEX_INITIALIZER;
+//#[no_mangle]
+//pub static mut __cg_clif_global_atomic_mutex: libc::pthread_mutex_t = libc::PTHREAD_MUTEX_INITIALIZER;
 
 pub(crate) fn init_global_lock(module: &mut Module<impl Backend>, bcx: &mut FunctionBuilder<'_>) {
     if std::env::var("CG_CLIF_JIT").is_ok() {

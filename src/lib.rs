@@ -20,10 +20,6 @@ extern crate rustc_symbol_mangling;
 extern crate rustc_target;
 extern crate rustc_ast;
 
-// This prevents duplicating functions and statics that are already part of the host rustc process.
-#[allow(unused_extern_crates)]
-extern crate rustc_driver;
-
 use std::any::Any;
 
 use rustc_errors::ErrorReported;

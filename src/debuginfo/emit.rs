@@ -70,6 +70,7 @@ impl WriterRelocate {
         }
     }
 
+    #[cfg(afalse)]//#[cfg(not(target_arch = "wasm32"))]
     pub(super) fn relocate_for_jit(
         mut self,
         jit_module: &mut cranelift_module::Module<cranelift_simplejit::SimpleJITBackend>,
