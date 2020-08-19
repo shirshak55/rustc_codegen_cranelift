@@ -70,6 +70,11 @@ pub(crate) fn trans_fn<'tcx, B: Backend + 'static>(
         });
     }
 
+    if name.starts_with("___chkstk") || name == "__alloca" {
+        context.clear();
+        return;
+    }
+
     // Recover all necessary data from fx, before accessing func will prevent future access to it.
     let instance = fx.instance;
     let mut clif_comments = fx.clif_comments;
@@ -743,10 +748,30 @@ fn trans_stmt<'tcx>(
                 }
                 // ___chkstk, ___chkstk_ms and __alloca are only used on Windows
                 _ if fx.tcx.symbol_name(fx.instance).name.starts_with("___chkstk") => {
-                    crate::trap::trap_unimplemented(fx, "Stack probes are not supported");
+                    use std::fmt::Write;
+                    let asm_name = fx.tcx.symbol_name(fx.instance).name;
+                    let mut generated_asm = String::new();
+                    writeln!(generated_asm, ".globl {}", asm_name).unwrap();
+                    writeln!(generated_asm, ".type {},@function", asm_name).unwrap();
+                    writeln!(generated_asm, ".section .text.{},\"ax\",@progbits", asm_name).unwrap();
+                    writeln!(generated_asm, "{}:", asm_name).unwrap();
+                    generated_asm.push_str(&*asm_code.as_str());
+                    writeln!(generated_asm, ".size {name}, .-{name}", name=asm_name).unwrap();
+                    generated_asm.push_str(".text\n");
+                    generated_asm.push_str("\n\n");
                 }
                 _ if fx.tcx.symbol_name(fx.instance).name == "__alloca" => {
-                    crate::trap::trap_unimplemented(fx, "Alloca is not supported");
+                    use std::fmt::Write;
+                    let asm_name = fx.tcx.symbol_name(fx.instance).name;
+                    let mut generated_asm = String::new();
+                    writeln!(generated_asm, ".globl {}", asm_name).unwrap();
+                    writeln!(generated_asm, ".type {},@function", asm_name).unwrap();
+                    writeln!(generated_asm, ".section .text.{},\"ax\",@progbits", asm_name).unwrap();
+                    writeln!(generated_asm, "{}:", asm_name).unwrap();
+                    generated_asm.push_str(&*asm_code.as_str());
+                    writeln!(generated_asm, ".size {name}, .-{name}", name=asm_name).unwrap();
+                    generated_asm.push_str(".text\n");
+                    generated_asm.push_str("\n\n");
                 }
                 // Used in sys::windows::abort_internal
                 "int $$0x29" => {
