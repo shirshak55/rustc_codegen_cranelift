@@ -137,8 +137,8 @@ fn clif_sig_from_fn_sig<'tcx>(
                 match pass_mode {
                     PassMode::NoPass | PassMode::ByVal(_) => {}
                     PassMode::ByRef { size: Some(size) } => {
-                        let purpose = ArgumentPurpose::StructArgument(u32::try_from(size.bytes()).expect("struct too big to pass on stack"));
-                        return EmptySinglePair::Single(AbiParam::special(pointer_ty(tcx), purpose)).into_iter();
+                        //let purpose = ArgumentPurpose::StructArgument(u32::try_from(size.bytes()).expect("struct too big to pass on stack"));
+                        //return EmptySinglePair::Single(AbiParam::special(pointer_ty(tcx), purpose)).into_iter();
                     }
                     PassMode::ByValPair(_, _) | PassMode::ByRef { size: None } => {
                         tcx.sess.span_warn(
@@ -175,7 +175,7 @@ fn clif_sig_from_fn_sig<'tcx>(
             (
                 Some(pointer_ty(tcx)) // First param is place to put return val
                     .into_iter()
-                    .map(|ty| AbiParam::special(ty, ArgumentPurpose::StructReturn))
+                    .map(|ty| AbiParam::special(ty, ArgumentPurpose::Normal))
                     .chain(inputs)
                     .collect(),
                 vec![],

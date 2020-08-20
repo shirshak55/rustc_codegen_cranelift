@@ -46,50 +46,6 @@ fn main() {
     assert_eq!(2.3f32.copysign(-1.0), -2.3f32);
     println!("{}", 2.3f32.powf(2.0));
 
-    assert_eq!(-128i8, (-128i8).saturating_sub(1));
-    assert_eq!(127i8, 127i8.saturating_sub(-128));
-    assert_eq!(-128i8, (-128i8).saturating_add(-128));
-    assert_eq!(127i8, 127i8.saturating_add(1));
-
-    assert_eq!(0b0000000000000000000000000010000010000000000000000000000000000000_0000000000100000000000000000000000001000000000000100000000000000u128.leading_zeros(), 26);
-    assert_eq!(0b0000000000000000000000000010000000000000000000000000000000000000_0000000000000000000000000000000000001000000000000000000010000000u128.trailing_zeros(), 7);
-
-    let _d = 0i128.checked_div(2i128);
-    let _d = 0u128.checked_div(2u128);
-    assert_eq!(1u128 + 2, 3);
-
-    assert_eq!(0b100010000000000000000000000000000u128 >> 10, 0b10001000000000000000000u128);
-    assert_eq!(0xFEDCBA987654321123456789ABCDEFu128 >> 64, 0xFEDCBA98765432u128);
-    assert_eq!(0xFEDCBA987654321123456789ABCDEFu128 as i128 >> 64, 0xFEDCBA98765432i128);
-
-    let tmp = 353985398u128;
-    assert_eq!(tmp * 932490u128, 330087843781020u128);
-
-    let tmp = -0x1234_5678_9ABC_DEF0i64;
-    assert_eq!(tmp as i128, -0x1234_5678_9ABC_DEF0i128);
-
-    // Check that all u/i128 <-> float casts work correctly.
-    let houndred_u128 = 100u128;
-    let houndred_i128 = 100i128;
-    let houndred_f32 = 100.0f32;
-    let houndred_f64 = 100.0f64;
-    assert_eq!(houndred_u128 as f32, 100.0);
-    assert_eq!(houndred_u128 as f64, 100.0);
-    assert_eq!(houndred_f32 as u128, 100);
-    assert_eq!(houndred_f64 as u128, 100);
-    assert_eq!(houndred_i128 as f32, 100.0);
-    assert_eq!(houndred_i128 as f64, 100.0);
-    assert_eq!(houndred_f32 as i128, 100);
-    assert_eq!(houndred_f64 as i128, 100);
-
-    // Test signed 128bit comparing
-    let max = usize::MAX as i128;
-    if 100i128 < 0i128 || 100i128 > max {
-        panic!();
-    }
-
-    test_checked_mul();
-
     let _a = 1u32 << 2u8;
 
     let empty: [i32; 0] = [];
@@ -105,26 +61,8 @@ fn main() {
     Box::pin(move |mut _task_context| {
         yield ();
     }).as_mut().resume(0);
-
-    #[derive(Copy, Clone)]
-    enum Nums {
-        NegOne = -1,
-    }
-
-    let kind = Nums::NegOne;
-    assert_eq!(-1i128, kind as i128);
-
-    let options = [1u128];
-    match options[0] {
-        1 => (),
-        0 => loop {},
-        v => panic(v),
-    };
 }
 
-fn panic(_: u128) {
-    panic!();
-}
 
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "sse2")]
@@ -301,27 +239,6 @@ unsafe fn test_mm_insert_epi16() {
     let r = _mm_insert_epi16(a, 9, 0);
     let e = _mm_setr_epi16(9, 1, 2, 3, 4, 5, 6, 7);
     assert_eq_m128i(r, e);
-}
-
-fn test_checked_mul() {
-    let u: Option<u8> = u8::from_str_radix("1000", 10).ok();
-    assert_eq!(u, None);
-
-    assert_eq!(1u8.checked_mul(255u8), Some(255u8));
-    assert_eq!(255u8.checked_mul(255u8), None);
-    assert_eq!(1i8.checked_mul(127i8), Some(127i8));
-    assert_eq!(127i8.checked_mul(127i8), None);
-    assert_eq!((-1i8).checked_mul(-127i8), Some(127i8));
-    assert_eq!(1i8.checked_mul(-128i8), Some(-128i8));
-    assert_eq!((-128i8).checked_mul(-128i8), None);
-
-    assert_eq!(1u64.checked_mul(u64::max_value()), Some(u64::max_value()));
-    assert_eq!(u64::max_value().checked_mul(u64::max_value()), None);
-    assert_eq!(1i64.checked_mul(i64::max_value()), Some(i64::max_value()));
-    assert_eq!(i64::max_value().checked_mul(i64::max_value()), None);
-    assert_eq!((-1i64).checked_mul(i64::min_value() + 1), Some(i64::max_value()));
-    assert_eq!(1i64.checked_mul(i64::min_value()), Some(i64::min_value()));
-    assert_eq!(i64::min_value().checked_mul(i64::min_value()), None);
 }
 
 #[derive(PartialEq)]

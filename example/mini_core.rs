@@ -577,7 +577,7 @@ struct PanicLocation {
 
 #[no_mangle]
 pub fn get_tls() -> u8 {
-    #[thread_local]
+    //#[thread_local]
     static A: u8 = 42;
 
     A

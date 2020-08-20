@@ -13,7 +13,7 @@ fi
 HOST_TRIPLE=$(rustc -vV | grep host | cut -d: -f2 | tr -d " ")
 TARGET_TRIPLE=$HOST_TRIPLE
 #TARGET_TRIPLE="x86_64-pc-windows-gnu"
-#TARGET_TRIPLE="aarch64-unknown-linux-gnu"
+TARGET_TRIPLE="aarch64-unknown-linux-gnu"
 
 linker=''
 RUN_WRAPPER=''

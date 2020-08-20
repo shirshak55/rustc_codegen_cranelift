@@ -319,7 +319,7 @@ fn build_isa(sess: &Session, enable_pic: bool) -> Box<dyn isa::TargetIsa + 'stat
     let mut isa_builder = cranelift_codegen::isa::lookup(target_triple).unwrap();
     // Don't use "haswell", as it implies `has_lzcnt`.macOS CI is still at Ivy Bridge EP, so `lzcnt`
     // is interpreted as `bsr`.
-    isa_builder.enable("nehalem").unwrap();
+    //isa_builder.enable("nehalem").unwrap();
     isa_builder.finish(flags)
 }
 

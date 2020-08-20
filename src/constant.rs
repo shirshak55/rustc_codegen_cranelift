@@ -48,7 +48,8 @@ pub(crate) fn codegen_tls_ref<'tcx>(
     let local_data_id = fx.module.declare_data_in_func(data_id, &mut fx.bcx.func);
     #[cfg(debug_assertions)]
     fx.add_comment(local_data_id, format!("tls {:?}", def_id));
-    let tls_ptr = fx.bcx.ins().tls_value(fx.pointer_type, local_data_id);
+    //let tls_ptr = fx.bcx.ins().tls_value(fx.pointer_type, local_data_id);
+    let tls_ptr = fx.bcx.ins().global_value(fx.pointer_type, local_data_id);
     CValue::by_val(tls_ptr, layout)
 }
 
@@ -250,7 +251,7 @@ fn data_id_for_static(
             &*symbol_name,
             linkage,
             is_mutable,
-            attrs.flags.contains(CodegenFnAttrFlags::THREAD_LOCAL),
+            false,//attrs.flags.contains(CodegenFnAttrFlags::THREAD_LOCAL),
             Some(align.try_into().unwrap()),
         )
         .unwrap();

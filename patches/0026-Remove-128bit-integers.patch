@@ -1,0 +1,868 @@
+From 39493558d4618a1a2cf704c16691b5fb65514fb3 Mon Sep 17 00:00:00 2001
+From: bjorn3 <bjorn3@users.noreply.github.com>
+Date: Thu, 20 Aug 2020 15:06:28 +0200
+Subject: [PATCH] Remove 128bit integers
+
+---
+ library/alloc/src/boxed.rs                    |   6 -
+ library/core/src/convert/num.rs               |  22 +-
+ library/core/src/fmt/num.rs                   |  15 +
+ library/core/src/hash/mod.rs                  |  20 --
+ library/core/src/num/mod.rs                   |  12 +-
+ library/core/src/sync/atomic.rs               |  36 ---
+ library/core/src/time.rs                      | 272 ------------------
+ library/proc_macro/src/lib.rs                 |   4 -
+ library/std/src/net/ip.rs                     |  42 ---
+ library/std/src/num.rs                        |   4 +-
+ library/std/src/panic.rs                      |   6 -
+ .../crates/core_arch/src/aarch64/neon/mod.rs  |  10 -
+ library/test/src/time.rs                      |   2 +-
+ 13 files changed, 29 insertions(+), 422 deletions(-)
+
+diff --git a/library/alloc/src/boxed.rs b/library/alloc/src/boxed.rs
+index 5e304be..9560ec2 100644
+--- a/library/alloc/src/boxed.rs
++++ b/library/alloc/src/boxed.rs
+@@ -676,9 +676,6 @@ impl<T: ?Sized + Hasher> Hasher for Box<T> {
+     fn write_u64(&mut self, i: u64) {
+         (**self).write_u64(i)
+     }
+-    fn write_u128(&mut self, i: u128) {
+-        (**self).write_u128(i)
+-    }
+     fn write_usize(&mut self, i: usize) {
+         (**self).write_usize(i)
+     }
+@@ -694,9 +691,6 @@ impl<T: ?Sized + Hasher> Hasher for Box<T> {
+     fn write_i64(&mut self, i: i64) {
+         (**self).write_i64(i)
+     }
+-    fn write_i128(&mut self, i: i128) {
+-        (**self).write_i128(i)
+-    }
+     fn write_isize(&mut self, i: isize) {
+         (**self).write_isize(i)
+     }
+diff --git a/library/core/src/convert/num.rs b/library/core/src/convert/num.rs
+index 336c0b2..e9727ab 100644
+--- a/library/core/src/convert/num.rs
++++ b/library/core/src/convert/num.rs
+@@ -36,8 +36,8 @@ macro_rules! impl_float_to_int {
+     }
+ }
+ 
+-impl_float_to_int!(f32 => u8 u16 u32 u64 u128 usize i8 i16 i32 i64 i128 isize);
+-impl_float_to_int!(f64 => u8 u16 u32 u64 u128 usize i8 i16 i32 i64 i128 isize);
++impl_float_to_int!(f32 => u8 u16 u32 u64 usize i8 i16 i32 i64 isize);
++impl_float_to_int!(f64 => u8 u16 u32 u64 usize i8 i16 i32 i64 isize);
+ 
+ // Conversion traits for primitive integer and float types
+ // Conversions T -> T are covered by a blanket impl and therefore excluded
+@@ -274,7 +274,7 @@ try_from_upper_bounded!(u8, i8);
+ try_from_upper_bounded!(u16, i8, i16);
+ try_from_upper_bounded!(u32, i8, i16, i32);
+ try_from_upper_bounded!(u64, i8, i16, i32, i64);
+-try_from_upper_bounded!(u128, i8, i16, i32, i64, i128);
++try_from_upper_bounded!(u128, i8, i16, i32, i64);
+ 
+ // signed-to-unsigned
+ try_from_lower_bounded!(i8, u8, u16, u32, u64, u128);
+@@ -367,13 +367,11 @@ mod ptr_try_from_impls {
+ }
+ 
+ // Conversion traits for non-zero integer types
+-use crate::num::NonZeroI128;
+ use crate::num::NonZeroI16;
+ use crate::num::NonZeroI32;
+ use crate::num::NonZeroI64;
+ use crate::num::NonZeroI8;
+ use crate::num::NonZeroIsize;
+-use crate::num::NonZeroU128;
+ use crate::num::NonZeroU16;
+ use crate::num::NonZeroU32;
+ use crate::num::NonZeroU64;
+@@ -410,42 +408,30 @@ macro_rules! nzint_impl_from {
+ nzint_impl_from! { NonZeroU8, NonZeroU16, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroU8, NonZeroU32, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroU8, NonZeroU64, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+-nzint_impl_from! { NonZeroU8, NonZeroU128, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroU8, NonZeroUsize, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroU16, NonZeroU32, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroU16, NonZeroU64, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+-nzint_impl_from! { NonZeroU16, NonZeroU128, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroU16, NonZeroUsize, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroU32, NonZeroU64, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+-nzint_impl_from! { NonZeroU32, NonZeroU128, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+-nzint_impl_from! { NonZeroU64, NonZeroU128, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ 
+ // Non-zero Signed -> Non-zero Signed
+ nzint_impl_from! { NonZeroI8, NonZeroI16, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroI8, NonZeroI32, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroI8, NonZeroI64, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+-nzint_impl_from! { NonZeroI8, NonZeroI128, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroI8, NonZeroIsize, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroI16, NonZeroI32, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroI16, NonZeroI64, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+-nzint_impl_from! { NonZeroI16, NonZeroI128, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroI16, NonZeroIsize, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroI32, NonZeroI64, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+-nzint_impl_from! { NonZeroI32, NonZeroI128, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+-nzint_impl_from! { NonZeroI64, NonZeroI128, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ 
+ // NonZero UnSigned -> Non-zero Signed
+ nzint_impl_from! { NonZeroU8, NonZeroI16, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroU8, NonZeroI32, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroU8, NonZeroI64, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+-nzint_impl_from! { NonZeroU8, NonZeroI128, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroU8, NonZeroIsize, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroU16, NonZeroI32, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroU16, NonZeroI64, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+-nzint_impl_from! { NonZeroU16, NonZeroI128, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ nzint_impl_from! { NonZeroU32, NonZeroI64, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+-nzint_impl_from! { NonZeroU32, NonZeroI128, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+-nzint_impl_from! { NonZeroU64, NonZeroI128, #[stable(feature = "nz_int_conv", since = "1.41.0")] }
+ 
+ macro_rules! nzint_impl_try_from_int {
+     ($Int: ty, $NonZeroInt: ty, #[$attr:meta], $doc: expr) => {
+@@ -477,11 +463,9 @@ nzint_impl_try_from_int! { u8, NonZeroU8, #[stable(feature = "nzint_try_from_int
+ nzint_impl_try_from_int! { u16, NonZeroU16, #[stable(feature = "nzint_try_from_int_conv", since = "1.46.0")] }
+ nzint_impl_try_from_int! { u32, NonZeroU32, #[stable(feature = "nzint_try_from_int_conv", since = "1.46.0")] }
+ nzint_impl_try_from_int! { u64, NonZeroU64, #[stable(feature = "nzint_try_from_int_conv", since = "1.46.0")] }
+-nzint_impl_try_from_int! { u128, NonZeroU128, #[stable(feature = "nzint_try_from_int_conv", since = "1.46.0")] }
+ nzint_impl_try_from_int! { usize, NonZeroUsize, #[stable(feature = "nzint_try_from_int_conv", since = "1.46.0")] }
+ nzint_impl_try_from_int! { i8, NonZeroI8, #[stable(feature = "nzint_try_from_int_conv", since = "1.46.0")] }
+ nzint_impl_try_from_int! { i16, NonZeroI16, #[stable(feature = "nzint_try_from_int_conv", since = "1.46.0")] }
+ nzint_impl_try_from_int! { i32, NonZeroI32, #[stable(feature = "nzint_try_from_int_conv", since = "1.46.0")] }
+ nzint_impl_try_from_int! { i64, NonZeroI64, #[stable(feature = "nzint_try_from_int_conv", since = "1.46.0")] }
+-nzint_impl_try_from_int! { i128, NonZeroI128, #[stable(feature = "nzint_try_from_int_conv", since = "1.46.0")] }
+ nzint_impl_try_from_int! { isize, NonZeroIsize, #[stable(feature = "nzint_try_from_int_conv", since = "1.46.0")] }
+diff --git a/library/core/src/fmt/num.rs b/library/core/src/fmt/num.rs
+index 7d77e33..75b0c71 100644
+--- a/library/core/src/fmt/num.rs
++++ b/library/core/src/fmt/num.rs
+@@ -23,12 +23,19 @@ trait Int:
+ 
+ macro_rules! doit {
+     ($($t:ident)*) => ($(impl Int for $t {
++        #[inline]
+         fn zero() -> Self { 0 }
++        #[inline]
+         fn from_u8(u: u8) -> Self { u as Self }
++        #[inline]
+         fn to_u8(&self) -> u8 { *self as u8 }
++        #[inline]
+         fn to_u16(&self) -> u16 { *self as u16 }
++        #[inline]
+         fn to_u32(&self) -> u32 { *self as u32 }
++        #[inline]
+         fn to_u64(&self) -> u64 { *self as u64 }
++        #[inline]
+         fn to_u128(&self) -> u128 { *self as u128 }
+     })*)
+ }
+@@ -47,6 +54,7 @@ trait GenericRadix {
+     fn digit(x: u8) -> u8;
+ 
+     /// Format an integer using the radix using a formatter.
++    #[inline]
+     fn fmt_int<T: Int>(&self, mut x: T, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+         // The radix can be as low as 2, so we need a buffer of at least 128
+         // characters for a base 2 number.
+@@ -112,6 +120,7 @@ macro_rules! radix {
+         impl GenericRadix for $T {
+             const BASE: u8 = $base;
+             const PREFIX: &'static str = $prefix;
++            #[inline]
+             fn digit(x: u8) -> u8 {
+                 match x {
+                     $($x => $conv,)+
+@@ -133,6 +142,7 @@ macro_rules! int_base {
+     ($Trait:ident for $T:ident as $U:ident -> $Radix:ident) => {
+         #[stable(feature = "rust1", since = "1.0.0")]
+         impl fmt::$Trait for $T {
++            #[inline]
+             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                 $Radix.fmt_int(*self as $U, f)
+             }
+@@ -188,6 +198,7 @@ static DEC_DIGITS_LUT: &[u8; 200] = b"0001020304050607080910111213141516171819\
+ 
+ macro_rules! impl_Display {
+     ($($t:ident),* as $u:ident via $conv_fn:ident named $name:ident) => {
++        #[inline]
+         fn $name(mut n: $u, is_nonnegative: bool, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+             // 2^128 is about 3*10^38, so 39 gives an extra byte of space
+             let mut buf = [MaybeUninit::<u8>::uninit(); 39];
+@@ -257,6 +268,7 @@ macro_rules! impl_Display {
+             #[stable(feature = "rust1", since = "1.0.0")]
+             impl fmt::Display for $t {
+                 #[allow(unused_comparisons)]
++                #[inline]
+                 fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                     let is_nonnegative = *self >= 0;
+                     let n = if is_nonnegative {
+@@ -273,6 +285,7 @@ macro_rules! impl_Display {
+ 
+ macro_rules! impl_Exp {
+     ($($t:ident),* as $u:ident via $conv_fn:ident named $name:ident) => {
++        #[inline]
+         fn $name(
+             mut n: $u,
+             is_nonnegative: bool,
+@@ -406,6 +419,7 @@ macro_rules! impl_Exp {
+             #[stable(feature = "integer_exp_format", since = "1.42.0")]
+             impl fmt::LowerExp for $t {
+                 #[allow(unused_comparisons)]
++                #[inline]
+                 fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                     let is_nonnegative = *self >= 0;
+                     let n = if is_nonnegative {
+@@ -421,6 +435,7 @@ macro_rules! impl_Exp {
+             #[stable(feature = "integer_exp_format", since = "1.42.0")]
+             impl fmt::UpperExp for $t {
+                 #[allow(unused_comparisons)]
++                #[inline]
+                 fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                     let is_nonnegative = *self >= 0;
+                     let n = if is_nonnegative {
+diff --git a/library/core/src/hash/mod.rs b/library/core/src/hash/mod.rs
+index 6abe19d..b70663a 100644
+--- a/library/core/src/hash/mod.rs
++++ b/library/core/src/hash/mod.rs
+@@ -310,12 +310,6 @@ pub trait Hasher {
+     fn write_u64(&mut self, i: u64) {
+         self.write(&i.to_ne_bytes())
+     }
+-    /// Writes a single `u128` into this hasher.
+-    #[inline]
+-    #[stable(feature = "i128", since = "1.26.0")]
+-    fn write_u128(&mut self, i: u128) {
+-        self.write(&i.to_ne_bytes())
+-    }
+     /// Writes a single `usize` into this hasher.
+     #[inline]
+     #[stable(feature = "hasher_write", since = "1.3.0")]
+@@ -347,12 +341,6 @@ pub trait Hasher {
+     fn write_i64(&mut self, i: i64) {
+         self.write_u64(i as u64)
+     }
+-    /// Writes a single `i128` into this hasher.
+-    #[inline]
+-    #[stable(feature = "i128", since = "1.26.0")]
+-    fn write_i128(&mut self, i: i128) {
+-        self.write_u128(i as u128)
+-    }
+     /// Writes a single `isize` into this hasher.
+     #[inline]
+     #[stable(feature = "hasher_write", since = "1.3.0")]
+@@ -381,9 +369,6 @@ impl<H: Hasher + ?Sized> Hasher for &mut H {
+     fn write_u64(&mut self, i: u64) {
+         (**self).write_u64(i)
+     }
+-    fn write_u128(&mut self, i: u128) {
+-        (**self).write_u128(i)
+-    }
+     fn write_usize(&mut self, i: usize) {
+         (**self).write_usize(i)
+     }
+@@ -399,9 +384,6 @@ impl<H: Hasher + ?Sized> Hasher for &mut H {
+     fn write_i64(&mut self, i: i64) {
+         (**self).write_i64(i)
+     }
+-    fn write_i128(&mut self, i: i128) {
+-        (**self).write_i128(i)
+-    }
+     fn write_isize(&mut self, i: isize) {
+         (**self).write_isize(i)
+     }
+@@ -591,8 +573,6 @@ mod impls {
+         (i32, write_i32),
+         (i64, write_i64),
+         (isize, write_isize),
+-        (u128, write_u128),
+-        (i128, write_i128),
+     }
+ 
+     #[stable(feature = "rust1", since = "1.0.0")]
+diff --git a/library/core/src/num/mod.rs b/library/core/src/num/mod.rs
+index 6893717..5d25e4f 100644
+--- a/library/core/src/num/mod.rs
++++ b/library/core/src/num/mod.rs
+@@ -182,13 +182,11 @@ nonzero_integers! {
+     #[stable(feature = "nonzero", since = "1.28.0")] NonZeroU16(u16);
+     #[stable(feature = "nonzero", since = "1.28.0")] NonZeroU32(u32);
+     #[stable(feature = "nonzero", since = "1.28.0")] NonZeroU64(u64);
+-    #[stable(feature = "nonzero", since = "1.28.0")] NonZeroU128(u128);
+     #[stable(feature = "nonzero", since = "1.28.0")] NonZeroUsize(usize);
+     #[stable(feature = "signed_nonzero", since = "1.34.0")] NonZeroI8(i8);
+     #[stable(feature = "signed_nonzero", since = "1.34.0")] NonZeroI16(i16);
+     #[stable(feature = "signed_nonzero", since = "1.34.0")] NonZeroI32(i32);
+     #[stable(feature = "signed_nonzero", since = "1.34.0")] NonZeroI64(i64);
+-    #[stable(feature = "signed_nonzero", since = "1.34.0")] NonZeroI128(i128);
+     #[stable(feature = "signed_nonzero", since = "1.34.0")] NonZeroIsize(isize);
+ }
+ 
+@@ -197,6 +195,7 @@ macro_rules! from_str_radix_nzint_impl {
+         #[stable(feature = "nonzero_parse", since = "1.35.0")]
+         impl FromStr for $t {
+             type Err = ParseIntError;
++            #[inline]
+             fn from_str(src: &str) -> Result<Self, Self::Err> {
+                 Self::new(from_str_radix(src, 10)?)
+                     .ok_or(ParseIntError {
+@@ -207,8 +206,8 @@ macro_rules! from_str_radix_nzint_impl {
+     )*}
+ }
+ 
+-from_str_radix_nzint_impl! { NonZeroU8 NonZeroU16 NonZeroU32 NonZeroU64 NonZeroU128 NonZeroUsize
+-NonZeroI8 NonZeroI16 NonZeroI32 NonZeroI64 NonZeroI128 NonZeroIsize }
++from_str_radix_nzint_impl! { NonZeroU8 NonZeroU16 NonZeroU32 NonZeroU64 NonZeroUsize
++NonZeroI8 NonZeroI16 NonZeroI32 NonZeroI64 NonZeroIsize }
+ 
+ /// Provides intentionally-wrapped arithmetic on `T`.
+ ///
+@@ -372,6 +371,7 @@ Basic usage:
+ $EndFeature, "
+ ```"),
+             #[stable(feature = "rust1", since = "1.0.0")]
++            #[inline]
+             pub fn from_str_radix(src: &str, radix: u32) -> Result<Self, ParseIntError> {
+                 from_str_radix(src, radix)
+             }
+@@ -2626,6 +2626,7 @@ Basic usage:
+ $EndFeature, "
+ ```"),
+             #[stable(feature = "rust1", since = "1.0.0")]
++            #[inline]
+             pub fn from_str_radix(src: &str, radix: u32) -> Result<Self, ParseIntError> {
+                 from_str_radix(src, radix)
+             }
+@@ -4282,6 +4283,7 @@ $EndFeature, "
+             #[unstable(feature = "wrapping_next_power_of_two", issue = "32463",
+                        reason = "needs decision on wrapping behaviour")]
+             #[rustc_const_unstable(feature = "const_int_pow", issue = "53718")]
++            #[inline]
+             pub const fn wrapping_next_power_of_two(self) -> Self {
+                 self.one_less_than_next_power_of_two().wrapping_add(1)
+             }
+@@ -5120,6 +5122,7 @@ macro_rules! from_str_radix_int_impl {
+         #[stable(feature = "rust1", since = "1.0.0")]
+         impl FromStr for $t {
+             type Err = ParseIntError;
++            #[inline]
+             fn from_str(src: &str) -> Result<Self, ParseIntError> {
+                 from_str_radix(src, 10)
+             }
+@@ -5204,6 +5207,7 @@ macro_rules! doit {
+ }
+ doit! { i8 i16 i32 i64 i128 isize u8 u16 u32 u64 u128 usize }
+ 
++#[inline]
+ fn from_str_radix<T: FromStrRadixHelper>(src: &str, radix: u32) -> Result<T, ParseIntError> {
+     use self::IntErrorKind::*;
+     use self::ParseIntError as PIE;
+diff --git a/library/core/src/sync/atomic.rs b/library/core/src/sync/atomic.rs
+index f31a4a0..e1ff6cf 100644
+--- a/library/core/src/sync/atomic.rs
++++ b/library/core/src/sync/atomic.rs
+@@ -2227,42 +2227,6 @@ atomic_int! {
+     "AtomicU64::new(0)",
+     u64 AtomicU64 ATOMIC_U64_INIT
+ }
+-#[cfg(target_has_atomic_load_store = "128")]
+-atomic_int! {
+-    cfg(target_has_atomic = "128"),
+-    unstable(feature = "integer_atomics", issue = "32976"),
+-    unstable(feature = "integer_atomics", issue = "32976"),
+-    unstable(feature = "integer_atomics", issue = "32976"),
+-    unstable(feature = "integer_atomics", issue = "32976"),
+-    unstable(feature = "integer_atomics", issue = "32976"),
+-    unstable(feature = "integer_atomics", issue = "32976"),
+-    rustc_const_stable(feature = "const_integer_atomics", since = "1.34.0"),
+-    unstable(feature = "integer_atomics", issue = "32976"),
+-    "i128", "../../../std/primitive.i128.html",
+-    "#![feature(integer_atomics)]\n\n",
+-    atomic_min, atomic_max,
+-    16,
+-    "AtomicI128::new(0)",
+-    i128 AtomicI128 ATOMIC_I128_INIT
+-}
+-#[cfg(target_has_atomic_load_store = "128")]
+-atomic_int! {
+-    cfg(target_has_atomic = "128"),
+-    unstable(feature = "integer_atomics", issue = "32976"),
+-    unstable(feature = "integer_atomics", issue = "32976"),
+-    unstable(feature = "integer_atomics", issue = "32976"),
+-    unstable(feature = "integer_atomics", issue = "32976"),
+-    unstable(feature = "integer_atomics", issue = "32976"),
+-    unstable(feature = "integer_atomics", issue = "32976"),
+-    rustc_const_stable(feature = "const_integer_atomics", since = "1.34.0"),
+-    unstable(feature = "integer_atomics", issue = "32976"),
+-    "u128", "../../../std/primitive.u128.html",
+-    "#![feature(integer_atomics)]\n\n",
+-    atomic_umin, atomic_umax,
+-    16,
+-    "AtomicU128::new(0)",
+-    u128 AtomicU128 ATOMIC_U128_INIT
+-}
+ #[cfg(target_has_atomic_load_store = "ptr")]
+ #[cfg(target_pointer_width = "16")]
+ macro_rules! ptr_width {
+diff --git a/library/core/src/time.rs b/library/core/src/time.rs
+index acaedbd..b1f9d9c 100644
+--- a/library/core/src/time.rs
++++ b/library/core/src/time.rs
+@@ -367,57 +367,6 @@ impl Duration {
+         self.nanos
+     }
+ 
+-    /// Returns the total number of whole milliseconds contained by this `Duration`.
+-    ///
+-    /// # Examples
+-    ///
+-    /// ```
+-    /// use std::time::Duration;
+-    ///
+-    /// let duration = Duration::new(5, 730023852);
+-    /// assert_eq!(duration.as_millis(), 5730);
+-    /// ```
+-    #[stable(feature = "duration_as_u128", since = "1.33.0")]
+-    #[rustc_const_stable(feature = "duration_as_u128", since = "1.33.0")]
+-    #[inline]
+-    pub const fn as_millis(&self) -> u128 {
+-        self.secs as u128 * MILLIS_PER_SEC as u128 + (self.nanos / NANOS_PER_MILLI) as u128
+-    }
+-
+-    /// Returns the total number of whole microseconds contained by this `Duration`.
+-    ///
+-    /// # Examples
+-    ///
+-    /// ```
+-    /// use std::time::Duration;
+-    ///
+-    /// let duration = Duration::new(5, 730023852);
+-    /// assert_eq!(duration.as_micros(), 5730023);
+-    /// ```
+-    #[stable(feature = "duration_as_u128", since = "1.33.0")]
+-    #[rustc_const_stable(feature = "duration_as_u128", since = "1.33.0")]
+-    #[inline]
+-    pub const fn as_micros(&self) -> u128 {
+-        self.secs as u128 * MICROS_PER_SEC as u128 + (self.nanos / NANOS_PER_MICRO) as u128
+-    }
+-
+-    /// Returns the total number of nanoseconds contained by this `Duration`.
+-    ///
+-    /// # Examples
+-    ///
+-    /// ```
+-    /// use std::time::Duration;
+-    ///
+-    /// let duration = Duration::new(5, 730023852);
+-    /// assert_eq!(duration.as_nanos(), 5730023852);
+-    /// ```
+-    #[stable(feature = "duration_as_u128", since = "1.33.0")]
+-    #[rustc_const_stable(feature = "duration_as_u128", since = "1.33.0")]
+-    #[inline]
+-    pub const fn as_nanos(&self) -> u128 {
+-        self.secs as u128 * NANOS_PER_SEC as u128 + self.nanos as u128
+-    }
+-
+     /// Checked `Duration` addition. Computes `self + other`, returning [`None`]
+     /// if overflow occurred.
+     ///
+@@ -555,227 +504,6 @@ impl Duration {
+         }
+     }
+ 
+-    /// Returns the number of seconds contained by this `Duration` as `f64`.
+-    ///
+-    /// The returned value does include the fractional (nanosecond) part of the duration.
+-    ///
+-    /// # Examples
+-    /// ```
+-    /// use std::time::Duration;
+-    ///
+-    /// let dur = Duration::new(2, 700_000_000);
+-    /// assert_eq!(dur.as_secs_f64(), 2.7);
+-    /// ```
+-    #[stable(feature = "duration_float", since = "1.38.0")]
+-    #[inline]
+-    #[rustc_const_unstable(feature = "duration_consts_2", issue = "72440")]
+-    pub const fn as_secs_f64(&self) -> f64 {
+-        (self.secs as f64) + (self.nanos as f64) / (NANOS_PER_SEC as f64)
+-    }
+-
+-    /// Returns the number of seconds contained by this `Duration` as `f32`.
+-    ///
+-    /// The returned value does include the fractional (nanosecond) part of the duration.
+-    ///
+-    /// # Examples
+-    /// ```
+-    /// use std::time::Duration;
+-    ///
+-    /// let dur = Duration::new(2, 700_000_000);
+-    /// assert_eq!(dur.as_secs_f32(), 2.7);
+-    /// ```
+-    #[stable(feature = "duration_float", since = "1.38.0")]
+-    #[inline]
+-    #[rustc_const_unstable(feature = "duration_consts_2", issue = "72440")]
+-    pub const fn as_secs_f32(&self) -> f32 {
+-        (self.secs as f32) + (self.nanos as f32) / (NANOS_PER_SEC as f32)
+-    }
+-
+-    /// Creates a new `Duration` from the specified number of seconds represented
+-    /// as `f64`.
+-    ///
+-    /// # Panics
+-    /// This constructor will panic if `secs` is not finite, negative or overflows `Duration`.
+-    ///
+-    /// # Examples
+-    /// ```
+-    /// use std::time::Duration;
+-    ///
+-    /// let dur = Duration::from_secs_f64(2.7);
+-    /// assert_eq!(dur, Duration::new(2, 700_000_000));
+-    /// ```
+-    #[stable(feature = "duration_float", since = "1.38.0")]
+-    #[inline]
+-    pub fn from_secs_f64(secs: f64) -> Duration {
+-        const MAX_NANOS_F64: f64 = ((u64::MAX as u128 + 1) * (NANOS_PER_SEC as u128)) as f64;
+-        let nanos = secs * (NANOS_PER_SEC as f64);
+-        if !nanos.is_finite() {
+-            panic!("got non-finite value when converting float to duration");
+-        }
+-        if nanos >= MAX_NANOS_F64 {
+-            panic!("overflow when converting float to duration");
+-        }
+-        if nanos < 0.0 {
+-            panic!("underflow when converting float to duration");
+-        }
+-        let nanos = nanos as u128;
+-        Duration {
+-            secs: (nanos / (NANOS_PER_SEC as u128)) as u64,
+-            nanos: (nanos % (NANOS_PER_SEC as u128)) as u32,
+-        }
+-    }
+-
+-    /// Creates a new `Duration` from the specified number of seconds represented
+-    /// as `f32`.
+-    ///
+-    /// # Panics
+-    /// This constructor will panic if `secs` is not finite, negative or overflows `Duration`.
+-    ///
+-    /// # Examples
+-    /// ```
+-    /// use std::time::Duration;
+-    ///
+-    /// let dur = Duration::from_secs_f32(2.7);
+-    /// assert_eq!(dur, Duration::new(2, 700_000_000));
+-    /// ```
+-    #[stable(feature = "duration_float", since = "1.38.0")]
+-    #[inline]
+-    pub fn from_secs_f32(secs: f32) -> Duration {
+-        const MAX_NANOS_F32: f32 = ((u64::MAX as u128 + 1) * (NANOS_PER_SEC as u128)) as f32;
+-        let nanos = secs * (NANOS_PER_SEC as f32);
+-        if !nanos.is_finite() {
+-            panic!("got non-finite value when converting float to duration");
+-        }
+-        if nanos >= MAX_NANOS_F32 {
+-            panic!("overflow when converting float to duration");
+-        }
+-        if nanos < 0.0 {
+-            panic!("underflow when converting float to duration");
+-        }
+-        let nanos = nanos as u128;
+-        Duration {
+-            secs: (nanos / (NANOS_PER_SEC as u128)) as u64,
+-            nanos: (nanos % (NANOS_PER_SEC as u128)) as u32,
+-        }
+-    }
+-
+-    /// Multiplies `Duration` by `f64`.
+-    ///
+-    /// # Panics
+-    /// This method will panic if result is not finite, negative or overflows `Duration`.
+-    ///
+-    /// # Examples
+-    /// ```
+-    /// use std::time::Duration;
+-    ///
+-    /// let dur = Duration::new(2, 700_000_000);
+-    /// assert_eq!(dur.mul_f64(3.14), Duration::new(8, 478_000_000));
+-    /// assert_eq!(dur.mul_f64(3.14e5), Duration::new(847_800, 0));
+-    /// ```
+-    #[stable(feature = "duration_float", since = "1.38.0")]
+-    #[inline]
+-    pub fn mul_f64(self, rhs: f64) -> Duration {
+-        Duration::from_secs_f64(rhs * self.as_secs_f64())
+-    }
+-
+-    /// Multiplies `Duration` by `f32`.
+-    ///
+-    /// # Panics
+-    /// This method will panic if result is not finite, negative or overflows `Duration`.
+-    ///
+-    /// # Examples
+-    /// ```
+-    /// use std::time::Duration;
+-    ///
+-    /// let dur = Duration::new(2, 700_000_000);
+-    /// // note that due to rounding errors result is slightly different
+-    /// // from 8.478 and 847800.0
+-    /// assert_eq!(dur.mul_f32(3.14), Duration::new(8, 478_000_640));
+-    /// assert_eq!(dur.mul_f32(3.14e5), Duration::new(847799, 969_120_256));
+-    /// ```
+-    #[stable(feature = "duration_float", since = "1.38.0")]
+-    #[inline]
+-    pub fn mul_f32(self, rhs: f32) -> Duration {
+-        Duration::from_secs_f32(rhs * self.as_secs_f32())
+-    }
+-
+-    /// Divide `Duration` by `f64`.
+-    ///
+-    /// # Panics
+-    /// This method will panic if result is not finite, negative or overflows `Duration`.
+-    ///
+-    /// # Examples
+-    /// ```
+-    /// use std::time::Duration;
+-    ///
+-    /// let dur = Duration::new(2, 700_000_000);
+-    /// assert_eq!(dur.div_f64(3.14), Duration::new(0, 859_872_611));
+-    /// // note that truncation is used, not rounding
+-    /// assert_eq!(dur.div_f64(3.14e5), Duration::new(0, 8_598));
+-    /// ```
+-    #[stable(feature = "duration_float", since = "1.38.0")]
+-    #[inline]
+-    pub fn div_f64(self, rhs: f64) -> Duration {
+-        Duration::from_secs_f64(self.as_secs_f64() / rhs)
+-    }
+-
+-    /// Divide `Duration` by `f32`.
+-    ///
+-    /// # Panics
+-    /// This method will panic if result is not finite, negative or overflows `Duration`.
+-    ///
+-    /// # Examples
+-    /// ```
+-    /// use std::time::Duration;
+-    ///
+-    /// let dur = Duration::new(2, 700_000_000);
+-    /// // note that due to rounding errors result is slightly
+-    /// // different from 0.859_872_611
+-    /// assert_eq!(dur.div_f32(3.14), Duration::new(0, 859_872_576));
+-    /// // note that truncation is used, not rounding
+-    /// assert_eq!(dur.div_f32(3.14e5), Duration::new(0, 8_598));
+-    /// ```
+-    #[stable(feature = "duration_float", since = "1.38.0")]
+-    #[inline]
+-    pub fn div_f32(self, rhs: f32) -> Duration {
+-        Duration::from_secs_f32(self.as_secs_f32() / rhs)
+-    }
+-
+-    /// Divide `Duration` by `Duration` and return `f64`.
+-    ///
+-    /// # Examples
+-    /// ```
+-    /// #![feature(div_duration)]
+-    /// use std::time::Duration;
+-    ///
+-    /// let dur1 = Duration::new(2, 700_000_000);
+-    /// let dur2 = Duration::new(5, 400_000_000);
+-    /// assert_eq!(dur1.div_duration_f64(dur2), 0.5);
+-    /// ```
+-    #[unstable(feature = "div_duration", issue = "63139")]
+-    #[inline]
+-    #[rustc_const_unstable(feature = "duration_consts_2", issue = "72440")]
+-    pub const fn div_duration_f64(self, rhs: Duration) -> f64 {
+-        self.as_secs_f64() / rhs.as_secs_f64()
+-    }
+-
+-    /// Divide `Duration` by `Duration` and return `f32`.
+-    ///
+-    /// # Examples
+-    /// ```
+-    /// #![feature(div_duration)]
+-    /// use std::time::Duration;
+-    ///
+-    /// let dur1 = Duration::new(2, 700_000_000);
+-    /// let dur2 = Duration::new(5, 400_000_000);
+-    /// assert_eq!(dur1.div_duration_f32(dur2), 0.5);
+-    /// ```
+-    #[unstable(feature = "div_duration", issue = "63139")]
+-    #[inline]
+-    #[rustc_const_unstable(feature = "duration_consts_2", issue = "72440")]
+-    pub const fn div_duration_f32(self, rhs: Duration) -> f32 {
+-        self.as_secs_f32() / rhs.as_secs_f32()
+-    }
+ }
+ 
+ #[stable(feature = "duration", since = "1.3.0")]
+diff --git a/library/proc_macro/src/lib.rs b/library/proc_macro/src/lib.rs
+index de3866d..ed49225 100644
+--- a/library/proc_macro/src/lib.rs
++++ b/library/proc_macro/src/lib.rs
+@@ -976,13 +976,11 @@ impl Literal {
+         u16_suffixed => u16,
+         u32_suffixed => u32,
+         u64_suffixed => u64,
+-        u128_suffixed => u128,
+         usize_suffixed => usize,
+         i8_suffixed => i8,
+         i16_suffixed => i16,
+         i32_suffixed => i32,
+         i64_suffixed => i64,
+-        i128_suffixed => i128,
+         isize_suffixed => isize,
+     }
+ 
+@@ -991,13 +989,11 @@ impl Literal {
+         u16_unsuffixed => u16,
+         u32_unsuffixed => u32,
+         u64_unsuffixed => u64,
+-        u128_unsuffixed => u128,
+         usize_unsuffixed => usize,
+         i8_unsuffixed => i8,
+         i16_unsuffixed => i16,
+         i32_unsuffixed => i32,
+         i64_unsuffixed => i64,
+-        i128_unsuffixed => i128,
+         isize_unsuffixed => isize,
+     }
+ 
+diff --git a/library/std/src/net/ip.rs b/library/std/src/net/ip.rs
+index 159ab98..fad0e3b 100644
+--- a/library/std/src/net/ip.rs
++++ b/library/std/src/net/ip.rs
+@@ -1714,48 +1714,6 @@ impl FromInner<c::in6_addr> for Ipv6Addr {
+     }
+ }
+ 
+-#[stable(feature = "i128", since = "1.26.0")]
+-impl From<Ipv6Addr> for u128 {
+-    /// Convert an `Ipv6Addr` into a host byte order `u128`.
+-    ///
+-    /// # Examples
+-    ///
+-    /// ```
+-    /// use std::net::Ipv6Addr;
+-    ///
+-    /// let addr = Ipv6Addr::new(
+-    ///     0x1020, 0x3040, 0x5060, 0x7080,
+-    ///     0x90A0, 0xB0C0, 0xD0E0, 0xF00D,
+-    /// );
+-    /// assert_eq!(0x102030405060708090A0B0C0D0E0F00D_u128, u128::from(addr));
+-    /// ```
+-    fn from(ip: Ipv6Addr) -> u128 {
+-        let ip = ip.octets();
+-        u128::from_be_bytes(ip)
+-    }
+-}
+-#[stable(feature = "i128", since = "1.26.0")]
+-impl From<u128> for Ipv6Addr {
+-    /// Convert a host byte order `u128` into an `Ipv6Addr`.
+-    ///
+-    /// # Examples
+-    ///
+-    /// ```
+-    /// use std::net::Ipv6Addr;
+-    ///
+-    /// let addr = Ipv6Addr::from(0x102030405060708090A0B0C0D0E0F00D_u128);
+-    /// assert_eq!(
+-    ///     Ipv6Addr::new(
+-    ///         0x1020, 0x3040, 0x5060, 0x7080,
+-    ///         0x90A0, 0xB0C0, 0xD0E0, 0xF00D,
+-    ///     ),
+-    ///     addr);
+-    /// ```
+-    fn from(ip: u128) -> Ipv6Addr {
+-        Ipv6Addr::from(ip.to_be_bytes())
+-    }
+-}
+-
+ #[stable(feature = "ipv6_from_octets", since = "1.9.0")]
+ impl From<[u8; 16]> for Ipv6Addr {
+     /// Creates an `Ipv6Addr` from a sixteen element byte array.
+diff --git a/library/std/src/num.rs b/library/std/src/num.rs
+index b496c16..9959691 100644
+--- a/library/std/src/num.rs
++++ b/library/std/src/num.rs
+@@ -12,9 +12,9 @@ pub use core::num::Wrapping;
+ pub use core::num::{FpCategory, ParseFloatError, ParseIntError, TryFromIntError};
+ 
+ #[stable(feature = "signed_nonzero", since = "1.34.0")]
+-pub use core::num::{NonZeroI128, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroIsize};
++pub use core::num::{NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroIsize};
+ #[stable(feature = "nonzero", since = "1.28.0")]
+-pub use core::num::{NonZeroU128, NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize};
++pub use core::num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize};
+ 
+ #[unstable(
+     feature = "int_error_matching",
+diff --git a/library/std/src/panic.rs b/library/std/src/panic.rs
+index 6ad5519..7408027 100644
+--- a/library/std/src/panic.rs
++++ b/library/std/src/panic.rs
+@@ -253,9 +253,6 @@ impl RefUnwindSafe for atomic::AtomicI32 {}
+ #[cfg(target_has_atomic_load_store = "64")]
+ #[unstable(feature = "integer_atomics", issue = "32976")]
+ impl RefUnwindSafe for atomic::AtomicI64 {}
+-#[cfg(target_has_atomic_load_store = "128")]
+-#[unstable(feature = "integer_atomics", issue = "32976")]
+-impl RefUnwindSafe for atomic::AtomicI128 {}
+ 
+ #[cfg(target_has_atomic_load_store = "ptr")]
+ #[stable(feature = "unwind_safe_atomic_refs", since = "1.14.0")]
+@@ -272,9 +269,6 @@ impl RefUnwindSafe for atomic::AtomicU32 {}
+ #[cfg(target_has_atomic_load_store = "64")]
+ #[unstable(feature = "integer_atomics", issue = "32976")]
+ impl RefUnwindSafe for atomic::AtomicU64 {}
+-#[cfg(target_has_atomic_load_store = "128")]
+-#[unstable(feature = "integer_atomics", issue = "32976")]
+-impl RefUnwindSafe for atomic::AtomicU128 {}
+ 
+ #[cfg(target_has_atomic_load_store = "8")]
+ #[stable(feature = "unwind_safe_atomic_refs", since = "1.14.0")]
+diff --git a/library/stdarch/crates/core_arch/src/aarch64/neon/mod.rs b/library/stdarch/crates/core_arch/src/aarch64/neon/mod.rs
+index 66da364..bccda24 100644
+--- a/library/stdarch/crates/core_arch/src/aarch64/neon/mod.rs
++++ b/library/stdarch/crates/core_arch/src/aarch64/neon/mod.rs
+@@ -25,8 +25,6 @@ types! {
+     pub struct poly64_t(i64); // FIXME: check this!
+     /// ARM-specific 64-bit wide vector of two packed `p64`.
+     pub struct poly64x2_t(i64, i64); // FIXME: check this!
+-    /// ARM-specific 128-bit wide vector of one packed `p64`.
+-    pub struct poly128_t(i128); // FIXME: check this!
+ }
+ 
+ /// ARM-specific type containing two `int8x16_t` vectors.
+@@ -284,14 +282,6 @@ pub unsafe fn vpaddq_u8(a: uint8x16_t, b: uint8x16_t) -> uint8x16_t {
+     vpaddq_u8_(a, b)
+ }
+ 
+-/// Polynomial multiply long
+-#[inline]
+-#[target_feature(enable = "neon")]
+-#[cfg_attr(test, assert_instr(pmull))]
+-pub unsafe fn vmull_p64(a: poly64_t, b: poly64_t) -> poly128_t {
+-    transmute(vmull_p64_(transmute(a), transmute(b)))
+-}
+-
+ /// Vector add.
+ #[inline]
+ #[target_feature(enable = "neon")]
+diff --git a/library/test/src/time.rs b/library/test/src/time.rs
+index 96c090f..ac96005 100644
+--- a/library/test/src/time.rs
++++ b/library/test/src/time.rs
+@@ -66,7 +66,7 @@ pub struct TestExecTime(pub Duration);
+ 
+ impl fmt::Display for TestExecTime {
+     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+-        write!(f, "{:.3}s", self.0.as_secs_f64())
++        panic!();
+     }
+ }
+ 
+-- 
+2.20.1
+
