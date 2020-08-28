@@ -2,10 +2,11 @@
 
 #![feature(
     no_core, unboxed_closures, start, lang_items, box_syntax, never_type, linkage,
-    extern_types, thread_local
+    extern_types, thread_local, register_attr,
 )]
 #![no_core]
 #![allow(dead_code, non_camel_case_types)]
+#![register_attr(do_not_trace)]
 
 extern crate mini_core;
 
@@ -132,6 +133,15 @@ fn return_u128_pair() -> (u128, u128) {
 
 fn call_return_u128_pair() {
     return_u128_pair();
+}
+
+#[repr(C)]
+struct SwtLoc;
+
+#[do_not_trace]
+#[no_mangle]
+unsafe extern "C" fn __yk_swt_rec_loc(crate_hash: u64, def_idx: u32, bb_idx: u32) {
+    libc::printf("trace: %x %x %d\n\0" as *const str as *const i8, crate_hash, def_idx, bb_idx);
 }
 
 fn main() {

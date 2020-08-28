@@ -166,6 +166,29 @@ pub(crate) fn verify_func(tcx: TyCtxt<'_>, writer: &crate::pretty_clif::CommentW
 fn codegen_fn_content(fx: &mut FunctionCx<'_, '_, impl Backend>) {
     crate::constant::check_constants(fx);
 
+    let do_not_trace = rustc_span::Symbol::intern("do_not_trace");
+    let mut is_do_not_trace = false;
+    for attr in fx.tcx.get_attrs(fx.instance.def_id()).iter() {
+        if fx.tcx.sess.check_name(attr, do_not_trace) {
+            is_do_not_trace = true;
+        }
+    }
+
+    let trace_fn = if is_do_not_trace {
+        None
+    } else {
+        let func_id = fx.cx.module.declare_function(
+            "__yk_swt_rec_loc",
+            Linkage::Import,
+            &Signature {
+                params: vec![AbiParam::new(types::I64), AbiParam::new(types::I32), AbiParam::new(types::I32)],
+                returns: vec![],
+                call_conv: fx.cx.module.target_config().default_call_conv,
+            },
+        ).unwrap();
+        Some(fx.cx.module.declare_func_in_func(func_id, &mut fx.bcx.func))
+    };
+
     for (bb, bb_data) in fx.mir.basic_blocks().iter_enumerated() {
         let block = fx.get_block(bb);
         fx.bcx.switch_to_block(block);
@@ -177,6 +200,13 @@ fn codegen_fn_content(fx: &mut FunctionCx<'_, '_, impl Backend>) {
             // FIXME once unwinding is supported uncomment next lines
             // // Unwinding is unlikely to happen, so mark cleanup block's as cold.
             // fx.cold_blocks.insert(block);
+        }
+
+        if let Some(trace_fn) = trace_fn {
+            let crate_hash = fx.bcx.ins().iconst(types::I64, fx.tcx.crate_hash(fx.instance.def_id().krate).as_u64() as i64);
+            let def_idx = fx.bcx.ins().iconst(types::I32, fx.instance.def_id().index.as_u32() as i64);
+            let bb_idx = fx.bcx.ins().iconst(types::I32, block.as_u32() as i64);
+            fx.bcx.ins().call(trace_fn, &[crate_hash, def_idx, bb_idx]);
         }
 
         fx.bcx.ins().nop();
