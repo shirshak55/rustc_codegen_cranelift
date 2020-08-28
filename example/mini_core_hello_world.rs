@@ -82,6 +82,8 @@ fn start<T: Termination + 'static>(
     argc: isize,
     argv: *const *const u8,
 ) -> isize {
+    unsafe { yk_swt_start_tracing(); }
+
     if argc == 3 {
         //unsafe { puts(*argv as *const i8); }
         //unsafe { puts(*((argv as usize + intrinsics::size_of::<*const u8>()) as *const *const i8)); }
@@ -89,6 +91,33 @@ fn start<T: Termination + 'static>(
     }
 
     main().report();
+
+    unsafe {
+        let mut ret_trace_len = 0;
+        let mut buf = yk_swt_stop_tracing(&mut ret_trace_len);
+        if buf as usize == 0 {
+            intrinsics::abort();
+        }
+        libc::printf(
+            "ret: %p %p\n\0" as *const str as *const i8,
+            buf,
+            ret_trace_len,
+        );
+        loop {
+            if ret_trace_len == 0 {
+                break;
+            }
+            let swt_loc = *buf;
+            libc::printf(
+                "trace: %x %d %d\n\0" as *const str as *const i8,
+                swt_loc.crate_hash,
+                swt_loc.def_idx,
+                swt_loc.bb_idx,
+            );
+            buf = (buf as isize + intrinsics::size_of::<SwtLoc>() as isize) as *mut SwtLoc;
+            ret_trace_len = ret_trace_len - 1;
+        }
+    }
     0
 }
 
@@ -135,13 +164,121 @@ fn call_return_u128_pair() {
     return_u128_pair();
 }
 
-#[repr(C)]
-struct SwtLoc;
 
+// Rust translation of the C code removed in https://github.com/softdevteam/ykrustc/pull/121
+#[repr(C)]
+struct SwtLoc {
+    crate_hash: u64,
+    def_idx: u32,
+    bb_idx: u32,
+}
+
+unsafe impl Copy for SwtLoc {}
+
+const TL_TRACE_INIT_CAP: isize = 1024;
+const TL_TRACE_REALLOC_CAP: isize = 1024;
+
+/// The trace buffer.
+#[thread_local]
+static mut TRACE_BUF: *mut SwtLoc = 0 as *mut SwtLoc;
+
+/// The number of elements in the trace buffer.
+#[thread_local]
+static mut TRACE_BUF_LEN: isize = 0;
+
+/// The allocation capacity of the trace buffer (in elements).
+#[thread_local]
+static mut TRACE_BUF_CAP: isize = 0;
+
+/// true = we are tracing, false = we are not tracing or an error occurred.
+#[thread_local]
+static mut TRACING: bool = false;
+
+/// Start tracing on the current thread.
+/// A new trace buffer is allocated and MIR locations will be written into it on
+/// subsequent calls to `yk_swt_rec_loc`. If the current thread is already
+/// tracing, calling this will lead to undefined behaviour.
+#[do_not_trace]
+unsafe fn yk_swt_start_tracing() {
+    TRACE_BUF = calloc(TL_TRACE_INIT_CAP, intrinsics::size_of::<SwtLoc>() as isize) as *mut SwtLoc;
+    if TRACE_BUF as usize == 0 {
+        intrinsics::abort();
+    }
+
+    TRACE_BUF_CAP = TL_TRACE_INIT_CAP;
+    TRACING = true;
+}
+
+/// Record a location into the trace buffer if tracing is enabled on the current thread.
 #[do_not_trace]
 #[no_mangle]
 unsafe extern "C" fn __yk_swt_rec_loc(crate_hash: u64, def_idx: u32, bb_idx: u32) {
-    libc::printf("trace: %x %x %d\n\0" as *const str as *const i8, crate_hash, def_idx, bb_idx);
+    if !TRACING {
+        return;
+    }
+    //libc::printf("trace: %x %d %d\n\0" as *const str as *const i8, crate_hash, def_idx, bb_idx);
+
+    // Check if we need more space and reallocate if necessary.
+    if TRACE_BUF_LEN == TRACE_BUF_CAP {
+        if TRACE_BUF_CAP >= isize::MAX_VALUE - TL_TRACE_REALLOC_CAP {
+            // Trace capacity would overflow.
+            TRACING = false;
+            libc::puts("no trace" as *const str as *const i8);
+            return;
+        }
+        let new_cap = TRACE_BUF_CAP + TL_TRACE_REALLOC_CAP;
+
+        if new_cap > isize::MAX_VALUE / intrinsics::size_of::<SwtLoc>() as isize {
+            // New buffer size would overflow.
+            TRACING = false;
+            libc::puts("no trace" as *const str as *const i8);
+            return;
+        }
+        let new_size = new_cap * intrinsics::size_of::<SwtLoc>() as isize;
+
+        TRACE_BUF = realloc(TRACE_BUF as *mut u8, new_size) as *mut SwtLoc;
+        if TRACE_BUF as usize == 0 {
+            TRACING = false;
+            libc::puts("no trace" as *const str as *const i8);
+            return;
+        }
+
+        TRACE_BUF_CAP = new_cap;
+    }
+
+    *((TRACE_BUF as isize + TRACE_BUF_LEN * intrinsics::size_of::<SwtLoc>() as isize) as *mut SwtLoc) = SwtLoc { crate_hash, def_idx, bb_idx };
+    TRACE_BUF_LEN = TRACE_BUF_LEN + 1;
+}
+
+/// Stop tracing on the current thread.
+/// On success the trace buffer is returned and the number of locations it
+/// holds is written to `*ret_trace_len`. It is the responsibility of the caller
+/// to free the returned trace buffer. A NULL pointer is returned on error.
+/// Calling this function when tracing was not started with
+/// `yk_swt_start_tracing_impl()` results in undefined behaviour.
+#[do_not_trace]
+unsafe fn yk_swt_stop_tracing(ret_trace_len: &mut isize) -> *mut SwtLoc {
+    if !TRACING {
+        libc::puts("no trace recorded\n\0" as *const str as *const i8);
+        free(TRACE_BUF as *mut u8);
+        TRACE_BUF = 0 as *mut SwtLoc;
+        TRACE_BUF_LEN = 0;
+        *ret_trace_len = 0;
+        return 0 as *mut SwtLoc;
+    }
+
+    // We hand ownership of the trace to the caller. The caller is responsible
+    // for freeing the trace.
+    let ret_trace = TRACE_BUF;
+    *ret_trace_len = TRACE_BUF_LEN;
+
+    // Now reset all off the recorder's state.
+    TRACE_BUF = 0 as *mut SwtLoc;
+    TRACING = false;
+    TRACE_BUF_LEN = 0;
+    TRACE_BUF_CAP = 0;
+
+    return ret_trace;
 }
 
 fn main() {

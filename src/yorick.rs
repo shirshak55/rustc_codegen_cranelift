@@ -112,8 +112,8 @@ pub(crate) fn encode_sir(
     symbol_name: &str,
     func: &Function,
 ) -> ykpack::Body {
-    println!("====================================\n");
-    println!("{}", func);
+    //println!("====================================\n");
+    //println!("{}", func);
 
     let mut body = ykpack::Body {
         symbol_name: symbol_name.to_string(),
@@ -368,7 +368,7 @@ pub(crate) fn encode_sir(
 
     let body = sir_builder.finalize();
 
-    println!("{}", body);
+    //println!("{}", body);
 
     body
 }

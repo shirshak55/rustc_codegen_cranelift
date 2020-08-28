@@ -130,6 +130,30 @@ impl Mul for usize {
     }
 }
 
+impl Mul for isize {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        self * rhs
+    }
+}
+
+#[lang = "div"]
+pub trait Div<RHS = Self> {
+    type Output;
+
+    #[must_use]
+    fn div(self, rhs: RHS) -> Self::Output;
+}
+
+impl Div for isize {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        self * rhs
+    }
+}
+
 #[lang = "add"]
 pub trait Add<RHS = Self> {
     type Output;
@@ -160,6 +184,15 @@ impl Add for usize {
         self + rhs
     }
 }
+
+impl Add for isize {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self {
+        self + rhs
+    }
+}
+
 
 #[lang = "sub"]
 pub trait Sub<RHS = Self> {
@@ -198,6 +231,33 @@ impl Sub for i16 {
     fn sub(self, rhs: Self) -> Self {
         self - rhs
     }
+}
+
+impl Sub for isize {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self {
+        self - rhs
+    }
+}
+
+#[lang = "partial_ord"]
+pub trait PartialOrd<Rhs: ?Sized = Self>: PartialEq<Rhs> {
+    fn lt(&self, other: &Rhs) -> bool;
+    fn le(&self, other: &Rhs) -> bool;
+    fn gt(&self, other: &Rhs) -> bool;
+    fn ge(&self, other: &Rhs) -> bool;
+}
+
+impl PartialOrd for isize {
+    #[inline]
+    fn lt(&self, other: &Self) -> bool { (*self) < (*other) }
+    #[inline]
+    fn le(&self, other: &Self) -> bool { (*self) <= (*other) }
+    #[inline]
+    fn ge(&self, other: &Self) -> bool { (*self) >= (*other) }
+    #[inline]
+    fn gt(&self, other: &Self) -> bool { (*self) > (*other) }
 }
 
 #[lang = "rem"]
@@ -459,7 +519,7 @@ impl<T> Deref for Box<T> {
 
 #[lang = "exchange_malloc"]
 unsafe fn allocate(size: usize, _align: usize) -> *mut u8 {
-    libc::malloc(size)
+    libc::malloc(size as isize)
 }
 
 #[lang = "box_free"]
@@ -508,7 +568,9 @@ pub mod libc {
     extern "C" {
         pub fn puts(s: *const i8) -> i32;
         pub fn printf(format: *const i8, ...) -> i32;
-        pub fn malloc(size: usize) -> *mut u8;
+        pub fn malloc(size: isize) -> *mut u8;
+        pub fn calloc(nobj: isize, size: isize) -> *mut u8;
+        pub fn realloc(p: *mut u8, size: isize) -> *mut u8;
         pub fn free(ptr: *mut u8);
         pub fn memcpy(dst: *mut u8, src: *const u8, size: usize);
         pub fn memmove(dst: *mut u8, src: *const u8, size: usize);
@@ -581,4 +643,10 @@ pub fn get_tls() -> u8 {
     static A: u8 = 42;
 
     A
+}
+
+#[lang = "isize"]
+#[cfg(target_pointer_width = "64")]
+impl isize {
+    pub const MAX_VALUE: isize = 0x7fff_fff_fff_fff;
 }
