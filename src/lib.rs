@@ -1,4 +1,7 @@
-#![feature(rustc_private, decl_macro, type_alias_impl_trait, associated_type_bounds, never_type, try_blocks)]
+#![feature(
+    rustc_private, decl_macro, type_alias_impl_trait, associated_type_bounds, never_type,
+    try_blocks, bindings_after_at,
+)]
 #![warn(rust_2018_idioms)]
 #![warn(unused_lifetimes)]
 
@@ -70,6 +73,7 @@ mod trap;
 mod unsize;
 mod value_and_place;
 mod vtable;
+mod yorick;
 
 mod prelude {
     pub(crate) use std::convert::{TryFrom, TryInto};
@@ -130,6 +134,8 @@ struct CodegenCx<'tcx, B: Backend + 'static> {
     vtables: FxHashMap<(Ty<'tcx>, Option<ty::PolyExistentialTraitRef<'tcx>>), DataId>,
     debug_context: Option<DebugContext<'tcx>>,
     unwind_context: UnwindContext<'tcx>,
+    yk_types: ykpack::Types,
+    yk_packs: Vec<ykpack::Body>,
 }
 
 impl<'tcx, B: Backend + 'static> CodegenCx<'tcx, B> {
@@ -156,12 +162,18 @@ impl<'tcx, B: Backend + 'static> CodegenCx<'tcx, B> {
             vtables: FxHashMap::default(),
             debug_context,
             unwind_context,
+            yk_types: ykpack::Types {
+                crate_hash: tcx.crate_hash(LOCAL_CRATE).as_u64(),
+                types: vec![],
+                thread_tracers: vec![],
+            },
+            yk_packs: vec![],
         }
     }
 
-    fn finalize(mut self) -> (Module<B>, String, Option<DebugContext<'tcx>>, UnwindContext<'tcx>) {
+    fn finalize(mut self) -> (Module<B>, String, Option<DebugContext<'tcx>>, UnwindContext<'tcx>, ykpack::Types, Vec<ykpack::Body>) {
         self.constants_cx.finalize(self.tcx, &mut self.module);
-        (self.module, self.global_asm, self.debug_context, self.unwind_context)
+        (self.module, self.global_asm, self.debug_context, self.unwind_context, self.yk_types, self.yk_packs)
     }
 }
 

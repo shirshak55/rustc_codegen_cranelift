@@ -8,6 +8,7 @@ use crate::prelude::*;
 mod aot;
 #[cfg(feature = "jit")]
 mod jit;
+mod yorick;
 
 pub(crate) fn codegen_crate(
     tcx: TyCtxt<'_>,

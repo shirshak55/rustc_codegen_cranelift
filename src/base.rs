@@ -103,6 +103,10 @@ pub(crate) fn trans_fn<'tcx, B: Backend + 'static>(
     context.compute_domtree();
     context.eliminate_unreachable_code(cx.module.isa()).unwrap();
 
+    // Encode yorick sir
+    let pack = crate::yorick::encode_sir(&mut cx.yk_types, &name, &context.func);
+    cx.yk_packs.push(pack);
+
     // Define function
     let module = &mut cx.module;
     tcx.sess.time(
