@@ -1,5 +1,7 @@
 use std::convert::TryFrom;
 
+use rustc_middle::ty::{TyCtxt, Instance};
+
 use cranelift_codegen::entity::SecondaryMap;
 use cranelift_codegen::ir::{
     self, types, Block, Function, Inst, InstructionData, Opcode, Type, Value,
@@ -107,7 +109,9 @@ impl SirBuilder<'_> {
     }
 }
 
-pub(crate) fn encode_sir(
+pub(crate) fn encode_sir<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    instance: Instance<'tcx>,
     types: &mut ykpack::Types,
     symbol_name: &str,
     func: &Function,
@@ -122,6 +126,21 @@ pub(crate) fn encode_sir(
         local_decls: vec![],
         blocks: vec![],
     };
+
+    let trace_head = rustc_span::Symbol::intern("trace_head");
+    for attr in tcx.get_attrs(instance.def_id()).iter() {
+        if tcx.sess.check_name(attr, trace_head) {
+            println!("trace head");
+            body.flags |= ykpack::bodyflags::TRACE_HEAD;
+        }
+    }
+
+    let trace_tail = rustc_span::Symbol::intern("trace_tail");
+    for attr in tcx.get_attrs(instance.def_id()).iter() {
+        if tcx.sess.check_name(attr, trace_tail) {
+            body.flags |= ykpack::bodyflags::TRACE_TAIL;
+        }
+    }
 
     let mut stack_slot_map =
         cranelift_codegen::entity::SecondaryMap::with_capacity(func.stack_slots.keys().count());

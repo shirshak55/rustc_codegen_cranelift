@@ -6,7 +6,7 @@
 )]
 #![no_core]
 #![allow(dead_code, non_camel_case_types)]
-#![register_attr(do_not_trace)]
+#![register_attr(do_not_trace, trace_head, trace_tail)]
 
 extern crate mini_core;
 
@@ -109,9 +109,8 @@ fn start<T: Termination + 'static>(
             }
             let swt_loc = *buf;
             libc::printf(
-                "trace: %x %d %d\n\0" as *const str as *const i8,
-                swt_loc.crate_hash,
-                swt_loc.def_idx,
+                "trace: %s %d\n\0" as *const str as *const i8,
+                swt_loc.symbol_name,
                 swt_loc.bb_idx,
             );
             buf = (buf as isize + intrinsics::size_of::<SwtLoc>() as isize) as *mut SwtLoc;
@@ -168,8 +167,7 @@ fn call_return_u128_pair() {
 // Rust translation of the C code removed in https://github.com/softdevteam/ykrustc/pull/121
 #[repr(C)]
 struct SwtLoc {
-    crate_hash: u64,
-    def_idx: u32,
+    symbol_name: *const u8,
     bb_idx: u32,
 }
 
@@ -198,8 +196,13 @@ static mut TRACING: bool = false;
 /// A new trace buffer is allocated and MIR locations will be written into it on
 /// subsequent calls to `yk_swt_rec_loc`. If the current thread is already
 /// tracing, calling this will lead to undefined behaviour.
-#[do_not_trace]
+#[trace_head]
 unsafe fn yk_swt_start_tracing() {
+    yk_swt_start_tracing_impl();
+}
+
+#[do_not_trace]
+unsafe fn yk_swt_start_tracing_impl() {
     TRACE_BUF = calloc(TL_TRACE_INIT_CAP, intrinsics::size_of::<SwtLoc>() as isize) as *mut SwtLoc;
     if TRACE_BUF as usize == 0 {
         intrinsics::abort();
@@ -212,7 +215,7 @@ unsafe fn yk_swt_start_tracing() {
 /// Record a location into the trace buffer if tracing is enabled on the current thread.
 #[do_not_trace]
 #[no_mangle]
-unsafe extern "C" fn __yk_swt_rec_loc(crate_hash: u64, def_idx: u32, bb_idx: u32) {
+unsafe extern "C" fn __yk_swt_rec_loc(symbol_name: *const u8, bb_idx: u32) {
     if !TRACING {
         return;
     }
@@ -246,7 +249,7 @@ unsafe extern "C" fn __yk_swt_rec_loc(crate_hash: u64, def_idx: u32, bb_idx: u32
         TRACE_BUF_CAP = new_cap;
     }
 
-    *((TRACE_BUF as isize + TRACE_BUF_LEN * intrinsics::size_of::<SwtLoc>() as isize) as *mut SwtLoc) = SwtLoc { crate_hash, def_idx, bb_idx };
+    *((TRACE_BUF as isize + TRACE_BUF_LEN * intrinsics::size_of::<SwtLoc>() as isize) as *mut SwtLoc) = SwtLoc { symbol_name, bb_idx };
     TRACE_BUF_LEN = TRACE_BUF_LEN + 1;
 }
 
@@ -256,8 +259,13 @@ unsafe extern "C" fn __yk_swt_rec_loc(crate_hash: u64, def_idx: u32, bb_idx: u32
 /// to free the returned trace buffer. A NULL pointer is returned on error.
 /// Calling this function when tracing was not started with
 /// `yk_swt_start_tracing_impl()` results in undefined behaviour.
-#[do_not_trace]
+#[trace_tail]
 unsafe fn yk_swt_stop_tracing(ret_trace_len: &mut isize) -> *mut SwtLoc {
+    yk_swt_stop_tracing_impl(ret_trace_len)
+}
+
+#[do_not_trace]
+unsafe fn yk_swt_stop_tracing_impl(ret_trace_len: &mut isize) -> *mut SwtLoc {
     if !TRACING {
         libc::puts("no trace recorded\n\0" as *const str as *const i8);
         free(TRACE_BUF as *mut u8);

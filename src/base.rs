@@ -104,7 +104,7 @@ pub(crate) fn trans_fn<'tcx, B: Backend + 'static>(
     context.eliminate_unreachable_code(cx.module.isa()).unwrap();
 
     // Encode yorick sir
-    let pack = crate::yorick::encode_sir(&mut cx.yk_types, &name, &context.func);
+    let pack = crate::yorick::encode_sir(tcx, instance, &mut cx.yk_types, &name, &context.func);
     cx.yk_packs.push(pack);
 
     // Define function
@@ -174,19 +174,51 @@ fn codegen_fn_content(fx: &mut FunctionCx<'_, '_, impl Backend>) {
         }
     }
 
-    let trace_fn = if is_do_not_trace {
+    let trace_fn_and_self_name = if is_do_not_trace {
         None
     } else {
         let func_id = fx.cx.module.declare_function(
             "__yk_swt_rec_loc",
             Linkage::Import,
             &Signature {
-                params: vec![AbiParam::new(types::I64), AbiParam::new(types::I32), AbiParam::new(types::I32)],
+                params: vec![AbiParam::new(types::I64), AbiParam::new(types::I32)],
                 returns: vec![],
                 call_conv: fx.cx.module.target_config().default_call_conv,
             },
         ).unwrap();
-        Some(fx.cx.module.declare_func_in_func(func_id, &mut fx.bcx.func))
+        let trace_fn = fx.cx.module.declare_func_in_func(func_id, &mut fx.bcx.func);
+
+
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let self_name = format!("{}\0", fx.tcx.symbol_name(fx.instance).name);
+        let mut hasher = DefaultHasher::new();
+        self_name.hash(&mut hasher);
+        let msg_hash = hasher.finish();
+        let mut data_ctx = DataContext::new();
+        data_ctx.define(self_name.as_bytes().to_vec().into_boxed_slice());
+        let msg_id = fx
+            .cx
+            .module
+            .declare_data(
+                &format!("__sw_trace_self_name_{:08x}", msg_hash),
+                Linkage::Local,
+                false,
+                false,
+                None,
+            )
+            .unwrap();
+
+        fx.cx.module.define_data(msg_id, &data_ctx).unwrap();
+
+        let local_msg_id = fx.cx.module.declare_data_in_func(msg_id, fx.bcx.func);
+        #[cfg(debug_assertions)]
+        {
+            fx.add_comment(local_msg_id, self_name);
+        }
+
+        Some((trace_fn, local_msg_id))
     };
 
     for (bb, bb_data) in fx.mir.basic_blocks().iter_enumerated() {
@@ -202,11 +234,10 @@ fn codegen_fn_content(fx: &mut FunctionCx<'_, '_, impl Backend>) {
             // fx.cold_blocks.insert(block);
         }
 
-        if let Some(trace_fn) = trace_fn {
-            let crate_hash = fx.bcx.ins().iconst(types::I64, fx.tcx.crate_hash(fx.instance.def_id().krate).as_u64() as i64);
-            let def_idx = fx.bcx.ins().iconst(types::I32, fx.instance.def_id().index.as_u32() as i64);
+        if let Some((trace_fn, self_name)) = trace_fn_and_self_name {
+            let self_name = fx.bcx.ins().global_value(fx.pointer_type, self_name);
             let bb_idx = fx.bcx.ins().iconst(types::I32, block.as_u32() as i64);
-            fx.bcx.ins().call(trace_fn, &[crate_hash, def_idx, bb_idx]);
+            fx.bcx.ins().call(trace_fn, &[self_name, bb_idx]);
         }
 
         fx.bcx.ins().nop();
