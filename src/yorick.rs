@@ -183,6 +183,17 @@ pub(crate) fn encode_sir<'tcx>(
             if extra_info.sw_trace_insts.contains(inst) {
                 continue; // skip software tracing calls
             }
+
+            if func.dfg.inst_args(inst).iter().chain(func.dfg.inst_results(inst)).any(|&arg| func.dfg.value_type(arg).is_float() || func.dfg.value_type(arg).is_vector()) {
+                // floats and vector types not yet supported by Yorick
+                if func.dfg[inst].opcode().is_terminator() {
+                    sir_builder.terminate_block(ykpack::Terminator::Unimplemented(format!("{:?}", func.dfg[inst])));
+                } else {
+                    sir_builder.add_stmt(ykpack::Statement::Unimplemented(format!("{:?}", func.dfg[inst])));
+                }
+                continue;
+            }
+
             match &func.dfg[inst] {
                 InstructionData::NullAry {
                     opcode: Opcode::Nop,
@@ -238,7 +249,7 @@ pub(crate) fn encode_sir<'tcx>(
                         func.dfg.ctrl_typevar(inst),
                     );
                     let arg = sir_builder.local_for_value(
-                        *arg,
+                        func.dfg.resolve_aliases(*arg),
                         func.dfg.value_type(*arg),
                     );
                     sir_builder.add_stmt(ykpack::Statement::Assign(
@@ -261,7 +272,7 @@ pub(crate) fn encode_sir<'tcx>(
                         func.dfg.ctrl_typevar(inst),
                     );
                     let arg = sir_builder.local_for_value(
-                        *arg,
+                        func.dfg.resolve_aliases(*arg),
                         func.dfg.value_type(*arg),
                     );
                     sir_builder.add_stmt(ykpack::Statement::Assign(
@@ -285,11 +296,11 @@ pub(crate) fn encode_sir<'tcx>(
                         func.dfg.ctrl_typevar(inst),
                     );
                     let x = sir_builder.local_for_value(
-                        *x,
+                        func.dfg.resolve_aliases(*x),
                         func.dfg.value_type(*x),
                     );
                     let y = sir_builder.local_for_value(
-                        *y,
+                        func.dfg.resolve_aliases(*y),
                         func.dfg.value_type(*y),
                     );
 
@@ -339,7 +350,10 @@ pub(crate) fn encode_sir<'tcx>(
                                     projection: vec![],
                                 })
                             },
-                            ret_vals => panic!("{:?}", ret_vals),
+                            ret_vals => {
+                                sir_builder.add_stmt(ykpack::Statement::Unimplemented(format!("{:?}", inst)));
+                                continue;
+                            }
                         };
                         sir_builder.add_stmt(ykpack::Statement::Call(
                             ykpack::CallOperand::Unknown,
@@ -354,7 +368,26 @@ pub(crate) fn encode_sir<'tcx>(
                     args,
                     destination,
                 } => {
-                    // FIXME write block params
+                    for (param, arg) in func.dfg.block_params(*destination).iter().zip(args.as_slice(&func.dfg.value_lists).iter()) {
+                        let param = sir_builder.local_for_value(
+                            *param,
+                            func.dfg.value_type(*param),
+                        );
+                        let arg = sir_builder.local_for_value(
+                            func.dfg.resolve_aliases(*arg),
+                            func.dfg.value_type(*arg),
+                        );
+                        sir_builder.add_stmt(ykpack::Statement::Assign(
+                            ykpack::Place {
+                                local: param,
+                                projection: vec![],
+                            },
+                            ykpack::Rvalue::Use(ykpack::Operand::Place(ykpack::Place {
+                                local: arg,
+                                projection: vec![],
+                            })),
+                        ))
+                    }
                     sir_builder.terminate_block(ykpack::Terminator::Goto(
                         sir_builder.bb_for_block(*destination),
                     ));
@@ -365,7 +398,7 @@ pub(crate) fn encode_sir<'tcx>(
                     destination,
                 } => {
                     let arg = sir_builder.local_for_value(
-                        args.get(0, &func.dfg.value_lists).unwrap(),
+                        func.dfg.resolve_aliases(args.get(0, &func.dfg.value_lists).unwrap()),
                         func.dfg.ctrl_typevar(inst),
                     );
                     // FIXME write block params
