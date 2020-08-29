@@ -73,13 +73,20 @@ impl SirBuilder<'_> {
         idx
     }
 
-    fn switch_to_block(&mut self, block: Block) {
+    fn switch_to_clif_block(&mut self, block: Block) {
         assert!(self.current_block.is_none());
         let i = self.block_map[block];
         assert!(i != 0);
         assert_eq!(self.body.blocks[(i - 1) as usize].term, ykpack::Terminator::Unreachable);
         assert!(self.body.blocks[(i - 1) as usize].stmts.is_empty());
         self.current_block = Some(i - 1);
+    }
+
+    fn switch_to_block(&mut self, block: ykpack::BasicBlockIndex) {
+        assert!(self.current_block.is_none());
+        assert_eq!(self.body.blocks[block as usize].term, ykpack::Terminator::Unreachable);
+        assert!(self.body.blocks[block as usize].stmts.is_empty());
+        self.current_block = Some(block);
     }
 
     fn bb_for_block(&self, block: Block) -> ykpack::BasicBlockIndex {
@@ -178,7 +185,7 @@ pub(crate) fn encode_sir<'tcx>(
     }
 
     for block in func.layout.blocks() {
-        sir_builder.switch_to_block(block);
+        sir_builder.switch_to_clif_block(block);
         for inst in func.layout.block_insts(block) {
             if extra_info.sw_trace_insts.contains(inst) {
                 continue; // skip software tracing calls
@@ -334,7 +341,35 @@ pub(crate) fn encode_sir<'tcx>(
                     args,
                     func_ref: _,
                 } => {
-                    if args.len(&func.dfg.value_lists) != 0 {
+                    let next_block = sir_builder.create_block();
+                    sir_builder.terminate_block(ykpack::Terminator::Call {
+                        operand: ykpack::CallOperand::Unknown,
+                        args: vec![],
+                        destination: Some((ykpack::Place {
+                            local: ykpack::Local(0),
+                            projection: vec![],
+                        }, next_block)),
+                    });
+                    sir_builder.switch_to_block(next_block);
+                    for ret_val in func.dfg.inst_results(inst) {
+                        let ret_val_local = sir_builder.local_for_value(
+                            *ret_val,
+                            func.dfg.value_type(*ret_val),
+                        );
+                        sir_builder.add_stmt(ykpack::Statement::Assign(ykpack::Place {
+                            local: ret_val_local,
+                            projection: vec![],
+                        }, ykpack::Rvalue::Use(ykpack::Operand::Constant(ykpack::Constant::Int(
+                            ykpack::ConstantInt::UnsignedInt(match func.dfg.value_type(*ret_val) {
+                                types::I8 => ykpack::UnsignedInt::U8(0),
+                                types::I16 => ykpack::UnsignedInt::U16(0),
+                                types::I32 => ykpack::UnsignedInt::U32(0),
+                                types::I64 => ykpack::UnsignedInt::U64(0),
+                                ty => continue,
+                            }),
+                        )))));
+                    }
+                    /*if args.len(&func.dfg.value_lists) != 0 {
                         sir_builder
                             .add_stmt(ykpack::Statement::Unimplemented(format!("{:?}", inst_data)))
                     } else {
@@ -360,7 +395,7 @@ pub(crate) fn encode_sir<'tcx>(
                             vec![],
                             dest,
                         ));
-                    }
+                    }*/
                 }
 
                 InstructionData::Jump {
