@@ -54,6 +54,8 @@ pub(crate) fn trans_fn<'tcx, B: Backend + 'static>(
         next_ssa_var: 0,
 
         inline_asm_index: 0,
+
+        yk_extra_info: crate::yorick::ExtraInfo::default(),
     };
 
     let arg_uninhabited = fx.mir.args_iter().any(|arg| fx.layout_of(fx.monomorphize(&fx.mir.local_decls[arg].ty)).abi.is_uninhabited());
@@ -75,6 +77,7 @@ pub(crate) fn trans_fn<'tcx, B: Backend + 'static>(
     let source_info_set = fx.source_info_set;
     let local_map = fx.local_map;
     let cold_blocks = fx.cold_blocks;
+    let yk_extra_info = fx.yk_extra_info;
 
     // Store function in context
     let context = &mut cx.cached_context;
@@ -104,7 +107,7 @@ pub(crate) fn trans_fn<'tcx, B: Backend + 'static>(
     context.eliminate_unreachable_code(cx.module.isa()).unwrap();
 
     // Encode yorick sir
-    let pack = crate::yorick::encode_sir(tcx, instance, &mut cx.yk_types, &name, &context.func);
+    let pack = crate::yorick::encode_sir(tcx, instance, &mut cx.yk_types, &name, &context.func, yk_extra_info);
     cx.yk_packs.push(pack);
 
     // Define function
@@ -237,7 +240,11 @@ fn codegen_fn_content(fx: &mut FunctionCx<'_, '_, impl Backend>) {
         if let Some((trace_fn, self_name)) = trace_fn_and_self_name {
             let self_name = fx.bcx.ins().global_value(fx.pointer_type, self_name);
             let bb_idx = fx.bcx.ins().iconst(types::I32, block.as_u32() as i64);
-            fx.bcx.ins().call(trace_fn, &[self_name, bb_idx]);
+            let call_inst = fx.bcx.ins().call(trace_fn, &[self_name, bb_idx]);
+
+            fx.yk_extra_info.sw_trace_insts.insert(fx.bcx.func.dfg.value_def(self_name).unwrap_inst());
+            fx.yk_extra_info.sw_trace_insts.insert(fx.bcx.func.dfg.value_def(bb_idx).unwrap_inst());
+            fx.yk_extra_info.sw_trace_insts.insert(call_inst);
         }
 
         fx.bcx.ins().nop();

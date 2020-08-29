@@ -289,6 +289,8 @@ pub(crate) struct FunctionCx<'clif, 'tcx, B: Backend + 'static> {
     pub(crate) next_ssa_var: u32,
 
     pub(crate) inline_asm_index: u32,
+
+    pub(crate) yk_extra_info: crate::yorick::ExtraInfo,
 }
 
 impl<'tcx, B: Backend> LayoutOf for FunctionCx<'_, 'tcx, B> {

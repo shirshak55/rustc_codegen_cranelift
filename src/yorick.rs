@@ -2,10 +2,22 @@ use std::convert::TryFrom;
 
 use rustc_middle::ty::{TyCtxt, Instance};
 
-use cranelift_codegen::entity::SecondaryMap;
+use cranelift_codegen::entity::{EntitySet, SecondaryMap};
 use cranelift_codegen::ir::{
     self, types, Block, Function, Inst, InstructionData, Opcode, Type, Value,
 };
+
+pub(crate) struct ExtraInfo {
+    pub(crate) sw_trace_insts: EntitySet<Inst>,
+}
+
+impl Default for ExtraInfo {
+    fn default() -> Self {
+        Self {
+            sw_trace_insts: EntitySet::new(),
+        }
+    }
+}
 
 fn pack_ty_for_stack_slot(types: &mut ykpack::Types, size: u32) -> (u64, u32) {
     // FIXME re-use types
@@ -111,6 +123,7 @@ pub(crate) fn encode_sir<'tcx>(
     types: &mut ykpack::Types,
     symbol_name: &str,
     func: &Function,
+    extra_info: ExtraInfo,
 ) -> ykpack::Body {
     //println!("====================================\n");
     //println!("{}", func);
@@ -167,6 +180,9 @@ pub(crate) fn encode_sir<'tcx>(
     for block in func.layout.blocks() {
         sir_builder.switch_to_block(block);
         for inst in func.layout.block_insts(block) {
+            if extra_info.sw_trace_insts.contains(inst) {
+                continue; // skip software tracing calls
+            }
             match &func.dfg[inst] {
                 InstructionData::NullAry {
                     opcode: Opcode::Nop,
@@ -376,7 +392,30 @@ pub(crate) fn encode_sir<'tcx>(
                         .terminate_block(ykpack::Terminator::Unimplemented(format!("{:?}", inst)));
                     break;
                 }
-                inst => sir_builder.add_stmt(ykpack::Statement::Unimplemented(format!("{:?}", inst))),
+                inst_data => {
+                    sir_builder.add_stmt(ykpack::Statement::Unimplemented(format!("{:?}", inst_data)));
+                    /*for ret_val in func.dfg.inst_results(inst) {
+                        if !func.dfg.value_type(*ret_val).is_int() {
+                            continue;
+                        }
+                        let ret_val_local = sir_builder.local_for_value(
+                            *ret_val,
+                            func.dfg.value_type(*ret_val),
+                        );
+                        sir_builder.add_stmt(ykpack::Statement::Assign(ykpack::Place {
+                            local: ret_val_local,
+                            projection: vec![],
+                        }, ykpack::Rvalue::Use(ykpack::Operand::Constant(ykpack::Constant::Int(
+                            ykpack::ConstantInt::UnsignedInt(match func.dfg.value_type(*ret_val) {
+                                types::I8 => ykpack::UnsignedInt::U8(0),
+                                types::I16 => ykpack::UnsignedInt::U16(0),
+                                types::I32 => ykpack::UnsignedInt::U32(0),
+                                types::I64 => ykpack::UnsignedInt::U64(0),
+                                ty => continue,
+                            }),
+                        )))));
+                    };*/
+                }
             }
         }
     }
