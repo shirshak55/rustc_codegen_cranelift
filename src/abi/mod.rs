@@ -227,6 +227,7 @@ impl<'tcx, B: Backend + 'static> FunctionCx<'_, 'tcx, B> {
     /// Instance must be monomorphized
     pub(crate) fn get_function_ref(&mut self, inst: Instance<'tcx>) -> FuncRef {
         let func_id = import_function(self.tcx, &mut self.cx.module, inst);
+        self.yk_extra_info.func_names.insert(func_id, get_function_name_and_sig(self.tcx, self.cx.module.isa().triple(), inst, true).0);
         let func_ref = self
             .cx.module
             .declare_func_in_func(func_id, &mut self.bcx.func);

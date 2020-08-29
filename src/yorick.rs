@@ -1,20 +1,24 @@
 use std::convert::TryFrom;
+use std::collections::HashMap;
 
 use rustc_middle::ty::{TyCtxt, Instance};
 
 use cranelift_codegen::entity::{EntitySet, SecondaryMap};
 use cranelift_codegen::ir::{
-    self, types, Block, Function, Inst, InstructionData, Opcode, Type, Value,
+    self, types, Block, Function, Inst, InstructionData, Opcode, Type, Value, ExternalName
 };
+use cranelift_module::FuncId;
 
 pub(crate) struct ExtraInfo {
     pub(crate) sw_trace_insts: EntitySet<Inst>,
+    pub(crate) func_names: HashMap<FuncId, String>,
 }
 
 impl Default for ExtraInfo {
     fn default() -> Self {
         Self {
             sw_trace_insts: EntitySet::new(),
+            func_names: HashMap::new(),
         }
     }
 }
@@ -157,6 +161,11 @@ pub(crate) fn encode_sir<'tcx>(
             body.flags |= ykpack::bodyflags::TRACE_TAIL;
         }
     }
+
+    // Return place
+    body.local_decls.push(ykpack::LocalDecl {
+        ty: pack_ty_for_clif_ty(types, types::I64),
+    });
 
     let mut stack_slot_map =
         cranelift_codegen::entity::SecondaryMap::with_capacity(func.stack_slots.keys().count());
@@ -339,18 +348,33 @@ pub(crate) fn encode_sir<'tcx>(
                 InstructionData::Call {
                     opcode: Opcode::Call,
                     args,
-                    func_ref: _,
+                    func_ref,
                 } => {
+                    let call_operand = match func.dfg.ext_funcs[*func_ref].name {
+                        ExternalName::TestCase { length, ascii } => unreachable!(),
+                        ExternalName::User { namespace, index } => {
+                            assert_eq!(namespace, 0);
+                            extra_info
+                                .func_names
+                                .get(&FuncId::from_u32(index))
+                                .cloned()
+                                .map(ykpack::CallOperand::Fn)
+                                .unwrap_or(ykpack::CallOperand::Unknown) // FIXME
+                        }
+                        ExternalName::LibCall(_) => ykpack::CallOperand::Unknown, // FIXME
+                    };
+
                     let next_block = sir_builder.create_block();
                     sir_builder.terminate_block(ykpack::Terminator::Call {
-                        operand: ykpack::CallOperand::Unknown,
+                        operand: call_operand,
                         args: vec![],
                         destination: Some((ykpack::Place {
-                            local: ykpack::Local(0),
+                            local: ykpack::Local(1), // FIXME
                             projection: vec![],
                         }, next_block)),
                     });
                     sir_builder.switch_to_block(next_block);
+                    // FIXME
                     for ret_val in func.dfg.inst_results(inst) {
                         let ret_val_local = sir_builder.local_for_value(
                             *ret_val,
@@ -453,6 +477,12 @@ pub(crate) fn encode_sir<'tcx>(
                     args,
                 } => {
                     // FIXME write return params
+                    sir_builder.add_stmt(ykpack::Statement::Assign(ykpack::Place {
+                        local: ykpack::Local(0),
+                        projection: vec![],
+                    }, ykpack::Rvalue::Use(ykpack::Operand::Constant(ykpack::Constant::Int(
+                        ykpack::ConstantInt::UnsignedInt(ykpack::UnsignedInt::U64(0)),
+                    )))));
                     sir_builder.terminate_block(ykpack::Terminator::Return);
                 }
                 inst if inst.opcode().is_terminator() => {
