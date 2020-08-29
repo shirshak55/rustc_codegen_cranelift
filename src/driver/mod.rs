@@ -62,7 +62,6 @@ fn trans_mono_item<'tcx, B: Backend + 'static>(
     let tcx = cx.tcx;
     match mono_item {
         MonoItem::Fn(inst) => {
-            println!("{:?}", inst);
             let _inst_guard =
                 crate::PrintOnPanic(|| format!("{:?} {}", inst, tcx.symbol_name(inst).name));
             debug_assert!(!inst.substs.needs_infer());
