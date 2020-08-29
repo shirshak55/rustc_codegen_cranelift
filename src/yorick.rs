@@ -23,28 +23,24 @@ fn pack_ty_for_stack_slot(types: &mut ykpack::Types, size: u32) -> (u64, u32) {
     (types.crate_hash, ty_index)
 }
 
+pub fn preallocate_clif_types(types: &mut ykpack::Types) {
+    types.types.push(ykpack::Ty::UnsignedInt(ykpack::UnsignedIntTy::U8));
+    types.types.push(ykpack::Ty::UnsignedInt(ykpack::UnsignedIntTy::U16));
+    types.types.push(ykpack::Ty::UnsignedInt(ykpack::UnsignedIntTy::U32));
+    types.types.push(ykpack::Ty::UnsignedInt(ykpack::UnsignedIntTy::U64));
+    types.types.push(ykpack::Ty::UnsignedInt(ykpack::UnsignedIntTy::U128));
+}
+
 fn pack_ty_for_clif_ty(types: &mut ykpack::Types, clif_ty: Type) -> (u64, u32) {
-    // FIXME re-use types
-    let ty_index = types.types.len() as u32;
     match clif_ty {
-        types::B1 => types
-            .types
-            .push(ykpack::Ty::UnsignedInt(ykpack::UnsignedIntTy::U8)),
-        types::I8 => types
-            .types
-            .push(ykpack::Ty::UnsignedInt(ykpack::UnsignedIntTy::U8)),
-        types::I16 => types
-            .types
-            .push(ykpack::Ty::UnsignedInt(ykpack::UnsignedIntTy::U16)),
-        types::I32 => types
-            .types
-            .push(ykpack::Ty::UnsignedInt(ykpack::UnsignedIntTy::U32)),
-        types::I64 => types
-            .types
-            .push(ykpack::Ty::UnsignedInt(ykpack::UnsignedIntTy::U64)),
+        types::B1 => (types.crate_hash, 0),
+        types::I8 => (types.crate_hash, 0),
+        types::I16 => (types.crate_hash, 1),
+        types::I32 => (types.crate_hash, 2),
+        types::I64 => (types.crate_hash, 3),
+        types::I128 => (types.crate_hash, 4),
         _ => todo!("{}", clif_ty),
     }
-    (types.crate_hash, ty_index)
 }
 
 struct SirBuilder<'a> {

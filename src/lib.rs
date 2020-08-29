@@ -153,6 +153,14 @@ impl<'tcx, B: Backend + 'static> CodegenCx<'tcx, B> {
         } else {
             None
         };
+
+        let mut yk_types = ykpack::Types {
+            crate_hash: tcx.crate_hash(LOCAL_CRATE).as_u64(),
+            types: vec![],
+            thread_tracers: vec![],
+        };
+        crate::yorick::preallocate_clif_types(&mut yk_types);
+
         CodegenCx {
             tcx,
             module,
@@ -162,11 +170,7 @@ impl<'tcx, B: Backend + 'static> CodegenCx<'tcx, B> {
             vtables: FxHashMap::default(),
             debug_context,
             unwind_context,
-            yk_types: ykpack::Types {
-                crate_hash: tcx.crate_hash(LOCAL_CRATE).as_u64(),
-                types: vec![],
-                thread_tracers: vec![],
-            },
+            yk_types,
             yk_packs: vec![],
         }
     }
