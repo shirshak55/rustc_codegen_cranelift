@@ -178,7 +178,7 @@ fn codegen_fn_content(fx: &mut FunctionCx<'_, '_, impl Backend>) {
         }
     }
 
-    let trace_fn_and_self_name = if is_do_not_trace {
+    let trace_fn_and_self_name = if is_do_not_trace || true {
         None
     } else {
         let func_id = fx.cx.module.declare_function(
@@ -388,14 +388,14 @@ fn codegen_fn_content(fx: &mut FunctionCx<'_, '_, impl Backend>) {
                         fx.bcx.ins().jump(else_block, &[]);
                     }
                 } else {
-                let mut switch = ::cranelift_frontend::Switch::new();
-                for (i, value) in values.iter().enumerate() {
-                    let block = fx.get_block(targets[i]);
-                    switch.set_entry(*value, block);
+                    let mut switch = ::cranelift_frontend::Switch::new();
+                    for (i, value) in values.iter().enumerate() {
+                        let block = fx.get_block(targets[i]);
+                        switch.set_entry(*value, block);
+                    }
+                    let otherwise_block = fx.get_block(targets[targets.len() - 1]);
+                    switch.emit(&mut fx.bcx, discr, otherwise_block);
                 }
-                let otherwise_block = fx.get_block(targets[targets.len() - 1]);
-                switch.emit(&mut fx.bcx, discr, otherwise_block);
-            }
             }
             TerminatorKind::Call {
                 func,

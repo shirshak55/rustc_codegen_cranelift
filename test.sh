@@ -37,7 +37,7 @@ $RUSTC example/mini_core_hello_world.rs --crate-name mini_core_hello_world --cra
 $RUN_WRAPPER ./target/out/mini_core_hello_world abc bcd
 # (echo "break set -n main"; echo "run"; sleep 1; echo "si -c 10"; sleep 1; echo "frame variable") | lldb -- ./target/out/mini_core_hello_world abc bcd
 
-exit
+#exit
 
 #echo "[AOT] arbitrary_self_types_pointers_and_wrappers"
 #$RUSTC example/arbitrary_self_types_pointers_and_wrappers.rs --crate-name arbitrary_self_types_pointers_and_wrappers --crate-type bin --target $TARGET_TRIPLE
@@ -48,7 +48,7 @@ exit
 echo "[BUILD] sysroot"
 time ./build_sysroot/build_sysroot.sh --release
 
-exit
+#exit
 
 echo "[AOT] alloc_example"
 $RUSTC example/alloc_example.rs --crate-type bin --target $TARGET_TRIPLE
@@ -85,6 +85,8 @@ pushd rand
 rm -r ./target || true
 ../cargo.sh test --workspace
 popd
+
+exit
 
 pushd simple-raytracer
 if [[ "$HOST_TRIPLE" = "$TARGET_TRIPLE" ]]; then
