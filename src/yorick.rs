@@ -472,6 +472,27 @@ pub(crate) fn encode_sir<'tcx>(
                     });
                     break;
                 }
+                InstructionData::Branch {
+                    opcode: Opcode::Brnz,
+                    args,
+                    destination,
+                } => {
+                    let arg = sir_builder.local_for_value(
+                        func.dfg.resolve_aliases(args.get(0, &func.dfg.value_lists).unwrap()),
+                        func.dfg.ctrl_typevar(inst),
+                    );
+                    // FIXME write block params
+                    sir_builder.terminate_block(ykpack::Terminator::SwitchInt {
+                        discr: ykpack::Place {
+                            local: arg,
+                            projection: vec![],
+                        },
+                        values: vec![ykpack::SerU128::new(0)],
+                        target_bbs: vec![0], // FIXME
+                        otherwise_bb: sir_builder.bb_for_block(*destination), // FIXME
+                    });
+                    break;
+                }
                 InstructionData::MultiAry {
                     opcode: Opcode::Return,
                     args,
