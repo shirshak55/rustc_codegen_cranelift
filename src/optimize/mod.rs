@@ -2,6 +2,7 @@ use crate::prelude::*;
 
 mod code_layout;
 mod stack2reg;
+pub(crate) mod peephole;
 
 pub(crate) fn optimize_function<'tcx>(
     tcx: TyCtxt<'tcx>,
