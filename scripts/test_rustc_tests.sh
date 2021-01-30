@@ -78,17 +78,15 @@ rm src/test/ui/default-alloc-error-hook.rs
 rm -r src/test/ui/hygiene/
 
 rm -r src/test/ui/polymorphization/ # polymorphization not yet supported
+rm src/test/codegen-units/polymorphization/unused_type_parameters.rs # same
 
 rm -r src/test/run-make/fmt-write-bloat/ # tests an optimization
 rm src/test/ui/abi/mir/mir_codegen_calls_variadic.rs # requires float varargs
 rm src/test/ui/abi/variadic-ffi.rs # requires callee side vararg support
 
-rm src/test/codegen-units/polymorphization/unused_type_parameters.rs # FIXME failing assertion
-rm src/test/ui/align-with-extern-c-fn.rs # same
-rm src/test/ui/consts/cast-discriminant-zst-enum.rs # same
-rm src/test/ui/consts/const-nullary-univariant-enum.rs # same
+rm src/test/ui/consts/cast-discriminant-zst-enum.rs # FIXME failing assertion
 rm src/test/ui/issues/issue-23304-2.rs # same
-rm src/test/ui/issues/issue-36744-bitcast-args-if-needed.rs # same
+rm src/test/ui/consts/const-nullary-univariant-enum.rs # same
 
 echo "[TEST] rustc test suite"
 RUST_TEST_NOCAPTURE=1 COMPILETEST_FORCE_STAGE0=1 ./x.py test --stage 0 src/test/{codegen-units,run-make,run-pass-valgrind,ui} -vv
