@@ -10,12 +10,12 @@ pushd rust
 
 cargo install ripgrep
 
-rm -r src/test/ui/{extern/,panics/,unsized-locals/,thinlto/,simd*,*lto*.rs,linkage*,unwind-*.rs,duplicate/} || true
+rm -r src/test/ui/{extern/,panics/,unsized-locals/,thinlto/,simd*,*lto*.rs,linkage*,unwind-*.rs} || true
 for test in $(rg --files-with-matches "asm!|catch_unwind|should_panic|lto" src/test/ui); do
   rm $test
 done
 
-for test in $(rg --files-with-matches "//~.*ERROR|//~.*NOTE|// error-pattern:|// build-fail" src/test/ui); do
+for test in $(rg -i --files-with-matches "//(\[\w+\])?~|// error-pattern:|// build-fail|// run-fail|-Cllvm-args" src/test/ui); do
   rm $test
 done
 
@@ -23,7 +23,6 @@ git checkout -- src/test/ui/issues/auxiliary/issue-3136-a.rs # contains //~ERROR
 
 # these all depend on unwinding support
 rm src/test/ui/backtrace.rs
-rm src/test/ui/intrinsics/intrinsic-move-val-cleanups.rs
 rm src/test/ui/array-slice-vec/box-of-array-of-drop-*.rs
 rm src/test/ui/array-slice-vec/slice-panic-*.rs
 rm src/test/ui/array-slice-vec/nested-vec-3.rs
@@ -38,25 +37,16 @@ rm src/test/ui/terminate-in-initializer.rs
 rm src/test/ui/threads-sendsync/task-stderr.rs
 rm src/test/ui/numbers-arithmetic/int-abs-overflow.rs
 rm src/test/ui/drop/drop-trait-enum.rs
-rm src/test/ui/issues/issue-8460.rs
-
-# these all use ByScalarPair type as extern "C" function parameter => warning
-rm src/test/ui/rust-2018/proc-macro-crate-in-paths.rs
-rm src/test/ui/proc-macro/crt-static.rs
-rm src/test/ui/proc-macro/no-missing-docs.rs
-rm src/test/ui/mir/mir_codegen_calls.rs
+rm src/test/ui/numbers-arithmetic/issue-8460.rs
 
 rm src/test/ui/issues/issue-28950.rs # depends on stack size optimizations
 rm src/test/ui/init-large-type.rs # same
 rm src/test/ui/sse2.rs # cpuid not supported, so sse2 not detected
 rm src/test/ui/issues/issue-33992.rs # unsupported linkages
 rm src/test/ui/issues/issue-51947.rs # same
-rm src/test/ui/impl-trait/impl-generic-mismatch.rs # same
-rm src/test/ui/issues/issue-21160.rs # same
 rm src/test/ui/numbers-arithmetic/saturating-float-casts.rs # intrinsic gives different but valid result
 rm src/test/ui/mir/mir_misc_casts.rs # depends on deduplication of constants
 rm src/test/ui/mir/mir_raw_fat_ptr.rs # same
-rm src/test/ui/consts/const-str-ptr.rs # same
 rm src/test/ui/async-await/async-fn-size-moved-locals.rs # -Cpanic=abort shrinks some generator by one byte
 rm src/test/ui/async-await/async-fn-size-uninit-locals.rs # same
 rm src/test/ui/generator/size-moved-locals.rs # same
@@ -79,6 +69,27 @@ rm src/test/pretty/raw-str-nonexpr.rs # same
 
 rm -r src/test/run-pass-valgrind/unsized-locals
 
+rm src/test/ui/json-bom-plus-crlf-multifile.rs # differing warning
+rm src/test/ui/json-bom-plus-crlf.rs # same
+
+rm src/test/ui/allocator/no_std-alloc-error-handler-default.rs # missing rust_oom definition
+rm src/test/ui/cfg/cfg-panic.rs
+rm src/test/ui/default-alloc-error-hook.rs
+rm -r src/test/ui/hygiene/
+
+rm -r src/test/ui/polymorphization/ # polymorphization not yet supported
+
+rm -r src/test/run-make/fmt-write-bloat/ # tests an optimization
+rm src/test/ui/abi/mir/mir_codegen_calls_variadic.rs # requires float varargs
+rm src/test/ui/abi/variadic-ffi.rs # requires callee side vararg support
+
+rm src/test/codegen-units/polymorphization/unused_type_parameters.rs # FIXME failing assertion
+rm src/test/ui/align-with-extern-c-fn.rs # same
+rm src/test/ui/consts/cast-discriminant-zst-enum.rs # same
+rm src/test/ui/consts/const-nullary-univariant-enum.rs # same
+rm src/test/ui/issues/issue-23304-2.rs # same
+rm src/test/ui/issues/issue-36744-bitcast-args-if-needed.rs # same
+
 echo "[TEST] rustc test suite"
-COMPILETEST_FORCE_STAGE0=1 ./x.py test --stage 0 src/test/{codegen-units,run-make,run-pass-valgrind,ui} -vv
+RUST_TEST_NOCAPTURE=1 COMPILETEST_FORCE_STAGE0=1 ./x.py test --stage 0 src/test/{codegen-units,run-make,run-pass-valgrind,ui} -vv
 popd

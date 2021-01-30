@@ -333,7 +333,7 @@ fn build_isa(sess: &Session) -> Box<dyn isa::TargetIsa + 'static> {
             flags_builder.set("opt_level", "speed_and_size").unwrap();
         }
         OptLevel::Size | OptLevel::SizeMin => {
-            sess.warn("Optimizing for size is not supported. Just ignoring the request");
+            //sess.warn("Optimizing for size is not supported. Just ignoring the request");
         }
     }
 
