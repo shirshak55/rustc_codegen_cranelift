@@ -8,10 +8,15 @@ source ./config.sh
 
 dir=$(pwd)
 
-# Use rustc with cg_clif as hotpluggable backend instead of the custom cg_clif driver so that
-# build scripts are still compiled using cg_llvm.
-export RUSTC=$dir"/bin/cg_clif_build_sysroot"
-export RUSTFLAGS=$RUSTFLAGS" --clif"
+unamestr=$(uname)
+if [[ "$unamestr" == 'Linux' ]]; then
+   dylib_ext='so'
+elif [[ "$unamestr" == 'Darwin' ]]; then
+   dylib_ext='dylib'
+else
+   echo "Unsupported os"
+   exit 1
+fi
 
 cd "$(dirname "$0")"
 
@@ -23,7 +28,8 @@ rm -r target/*/{debug,release}/{build,deps,examples,libsysroot*,native} 2>/dev/n
 export CARGO_TARGET_DIR=target
 
 # Build libs
-export RUSTFLAGS="$RUSTFLAGS -Zforce-unstable-if-unmarked -Cpanic=abort"
+export RUSTC="$dir/bin/rustc"
+export RUSTFLAGS="-Zforce-unstable-if-unmarked -Cpanic=abort --sysroot $dir -Zcodegen-backend=cranelift"
 export __CARGO_DEFAULT_LIB_METADATA="cg_clif"
 if [[ "$1" != "--debug" ]]; then
     sysroot_channel='release'

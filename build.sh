@@ -34,15 +34,17 @@ done
 # Build cg_clif
 unset CARGO_TARGET_DIR
 unamestr=$(uname)
+HOST_TRIPLE=$(rustc -vV | grep host | cut -d: -f2 | tr -d " ")
 if [[ "$unamestr" == 'Linux' ]]; then
-   export RUSTFLAGS='-Clink-arg=-Wl,-rpath=$ORIGIN/../lib '$RUSTFLAGS
+   export RUSTFLAGS="-Clink-arg=-Wl,-rpath=\$ORIGIN/../lib/rustlib/$HOST_TRIPLE/codegen-backends "$RUSTFLAGS
 elif [[ "$unamestr" == 'Darwin' ]]; then
-   export RUSTFLAGS='-Csplit-debuginfo=unpacked -Clink-arg=-Wl,-rpath,@loader_path/../lib -Zosx-rpath-install-name '$RUSTFLAGS
+   export RUSTFLAGS="-Csplit-debuginfo=unpacked -Clink-arg=-Wl,-rpath,@loader_path/../lib/rustlib/$HOST_TRIPLE/codegen-backends -Zosx-rpath-install-name "$RUSTFLAGS
    dylib_ext='dylib'
 else
    echo "Unsupported os"
    exit 1
 fi
+unset HOST_TRIPLE
 if [[ "$CHANNEL" == "release" ]]; then
     cargo build $oldbe --release
 else
@@ -54,11 +56,14 @@ source scripts/ext_config.sh
 rm -rf "$target_dir"
 mkdir "$target_dir"
 mkdir "$target_dir"/bin "$target_dir"/lib
+mkdir -p "$target_dir/lib/rustlib/$HOST_TRIPLE/codegen-backends"
+mkdir -p "$target_dir/lib/rustlib/$TARGET_TRIPLE/lib/"
+ln "$(rustc --print sysroot)/bin/rustc" "$target_dir/bin"
 ln target/$CHANNEL/cg_clif{,_build_sysroot} "$target_dir"/bin
-ln target/$CHANNEL/*rustc_codegen_cranelift* "$target_dir"/lib
+ln target/$CHANNEL/librustc_codegen_cranelift.so "$target_dir/lib/rustlib/$HOST_TRIPLE/codegen-backends/librustc_codegen_cranelift.so"
+ln target/$CHANNEL/librustc_codegen_cranelift.so "$target_dir/lib/rustlib/$HOST_TRIPLE/codegen-backends/librustc_codegen_cranelift-$(rustc -vV | grep release | cut -d: -f2 |tr -d " ").so"
 ln rust-toolchain scripts/config.sh scripts/cargo.sh "$target_dir"
 
-mkdir -p "$target_dir/lib/rustlib/$TARGET_TRIPLE/lib/"
 if [[ "$TARGET_TRIPLE" == "x86_64-pc-windows-gnu" ]]; then
     cp $(rustc --print sysroot)/lib/rustlib/$TARGET_TRIPLE/lib/*.o "$target_dir/lib/rustlib/$TARGET_TRIPLE/lib/"
 fi
